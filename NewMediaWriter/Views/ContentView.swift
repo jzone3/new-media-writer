@@ -3,7 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var document: MarkdownDocument
     var fileURL: URL?
-    @SceneStorage("viewMode") private var mode: ViewMode = .markdown
+    @AppStorage("viewMode") private var mode: ViewMode = .markdown
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {

@@ -10,12 +10,27 @@ enum ScrollPassthrough {
         monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
             guard let content = event.window?.contentView else { return event }
             let point = content.convert(event.locationInWindow, from: nil)
-            guard let hit = content.hitTest(point) else { return event }
-            if hit is NSScrollView || hit.enclosingScrollView != nil { return event }
-            guard let scroll = deepestScrollView(in: content, containing: point) else { return event }
+            let hit = content.hitTest(point)
+            if let hit, let scroll = hit as? NSScrollView ?? hit.enclosingScrollView {
+                // A plain NSScrollView is our AppKit editor: it handles the wheel itself. SwiftUI's hosting
+                // scroll view spans the whole window and swallows wheel events that hit-test to its clip view
+                // or to overlay chrome (Copy pill, header), so drive it directly instead.
+                if type(of: scroll) == NSScrollView.self { return event }
+                scroll.scrollWheel(with: event)
+                return nil
+            }
+            guard let scroll = deepestScrollView(in: content, containing: point) ?? anyScrollView(in: content) else { return event }
             scroll.scrollWheel(with: event)
             return nil
         }
+    }
+
+    private static func anyScrollView(in view: NSView) -> NSScrollView? {
+        for sub in view.subviews where !sub.isHidden {
+            if let scroll = sub as? NSScrollView { return scroll }
+            if let found = anyScrollView(in: sub) { return found }
+        }
+        return nil
     }
 
     private static func deepestScrollView(in view: NSView, containing point: NSPoint) -> NSScrollView? {
