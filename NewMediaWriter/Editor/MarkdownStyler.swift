@@ -91,7 +91,7 @@ final class MarkdownStyler {
                 inCode.toggle()
                 codeLanguageLine = inCode
                 self.apply(storage, lineRange, font: self.theme.mono, color: self.theme.secondary)
-                storage.addAttribute(.mdMarker, value: true, range: lineRange)
+                self.hiddenLine(storage, lineRange)
                 storage.addAttribute(.mdCodeBackground, value: true, range: lineRange)
                 self.paragraph(storage, lineRange) { p in
                     p.paragraphSpacing = 0
@@ -164,7 +164,7 @@ final class MarkdownStyler {
 
         if MarkdownParser.isRule(trimmed) {
             apply(storage, range, font: theme.mono.withSize(13), color: theme.secondary)
-            marker(storage, range)
+            hiddenLine(storage, range)
             storage.addAttribute(.mdRule, value: true, range: range)
             paragraph(storage, range) { p in
                 p.alignment = .center
@@ -176,7 +176,7 @@ final class MarkdownStyler {
 
         if let img = MarkdownParser.standaloneImage(trimmed) {
             apply(storage, range, font: theme.mono.withSize(12), color: theme.secondary)
-            marker(storage, range)
+            hiddenLine(storage, range)
             storage.addAttribute(.mdImage, value: img.path, range: range)
             let h = imageHeight(img.path)
             paragraph(storage, range) { p in
@@ -280,6 +280,16 @@ final class MarkdownStyler {
         guard range.length > 0, range.location + range.length <= storage.length else { return }
         storage.addAttribute(.mdMarker, value: true, range: range)
         storage.addAttribute(.foregroundColor, value: theme.secondary, range: range)
+    }
+
+    /// Hides a whole line but keeps its first glyph (drawn clear) so the typesetter still
+    /// produces a real line fragment; an all-null-glyph paragraph collapses into the previous line.
+    private func hiddenLine(_ storage: NSTextStorage, _ range: NSRange) {
+        guard range.length > 0 else { return }
+        storage.addAttribute(.foregroundColor, value: NSColor.clear, range: NSRange(location: range.location, length: 1))
+        if range.length > 1 {
+            marker(storage, NSRange(location: range.location + 1, length: range.length - 1))
+        }
     }
 
     private func paragraph(_ storage: NSTextStorage, _ range: NSRange, _ edit: (NSMutableParagraphStyle) -> Void) {
