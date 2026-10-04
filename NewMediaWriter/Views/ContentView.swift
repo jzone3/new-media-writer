@@ -30,12 +30,10 @@ struct ContentView: View {
     @ViewBuilder
     private var content: some View {
         switch mode {
-        case .markdown, .raw:
-            MarkdownEditor(document: document, fileURL: fileURL, raw: mode == .raw)
+        case .markdown, .plaintext:
+            MarkdownEditor(document: document, fileURL: fileURL, raw: mode == .plaintext)
         case .xPost:
             ProfileReader { profile in XPostFeedView(text: document.text, baseURL: fileURL, profile: profile) }
-        case .xArticle:
-            ProfileReader { profile in XArticleView(text: document.text, baseURL: fileURL, profile: profile) }
         case .linkedin:
             ProfileReader { profile in LinkedInFeedView(text: document.text, baseURL: fileURL, profile: profile) }
         case .slack:
@@ -45,8 +43,8 @@ struct ContentView: View {
 
     private var background: Color {
         switch mode {
-        case .markdown, .raw: Color(nsColor: .textBackgroundColor)
-        case .xPost, .xArticle: Color.adaptive(light: 0xFFFFFF, dark: 0x000000)
+        case .markdown, .plaintext: Color(nsColor: .textBackgroundColor)
+        case .xPost: Color.adaptive(light: 0xFFFFFF, dark: 0x000000)
         case .linkedin: Color.adaptive(light: 0xF4F2EE, dark: 0x000000)
         case .slack: Color.adaptive(light: 0xFFFFFF, dark: 0x1A1D21)
         }

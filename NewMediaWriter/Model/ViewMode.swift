@@ -1,23 +1,33 @@
 import SwiftUI
 
 enum ViewMode: String, CaseIterable, Identifiable, Codable {
-    case markdown, raw, xPost, xArticle, linkedin, slack
+    case plaintext, markdown, xPost, linkedin, slack
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .plaintext: "Plaintext"
         case .markdown: "Markdown"
-        case .raw: "Raw Markdown"
-        case .xPost: "X Post"
-        case .xArticle: "X Article"
+        case .xPost: "X"
         case .linkedin: "LinkedIn"
         case .slack: "Slack"
         }
     }
 
-    var isEditor: Bool { self == .markdown || self == .raw }
-    var isX: Bool { self == .xPost || self == .xArticle }
+    var shortcut: KeyEquivalent {
+        switch self {
+        case .plaintext: "1"
+        case .markdown: "2"
+        case .xPost: "3"
+        case .linkedin: "4"
+        case .slack: "5"
+        }
+    }
+
+    var shortcutLabel: String { "⌘\(shortcut.character)" }
+
+    var isEditor: Bool { self == .markdown || self == .plaintext }
 }
 
 struct ViewModeFocusedKey: FocusedValueKey {
@@ -37,19 +47,10 @@ struct ViewCommands: Commands {
     var body: some Commands {
         CommandGroup(after: .sidebar) {
             Divider()
-            Button("Markdown") { viewMode?.wrappedValue = .markdown }
-                .keyboardShortcut("1", modifiers: .command)
-            Button("Raw Markdown") { viewMode?.wrappedValue = .raw }
-                .keyboardShortcut("1", modifiers: [.command, .shift])
-            Divider()
-            Button("X Post") { viewMode?.wrappedValue = .xPost }
-                .keyboardShortcut("2", modifiers: .command)
-            Button("X Article") { viewMode?.wrappedValue = .xArticle }
-                .keyboardShortcut("2", modifiers: [.command, .shift])
-            Button("LinkedIn") { viewMode?.wrappedValue = .linkedin }
-                .keyboardShortcut("3", modifiers: .command)
-            Button("Slack") { viewMode?.wrappedValue = .slack }
-                .keyboardShortcut("4", modifiers: .command)
+            ForEach(ViewMode.allCases) { m in
+                Button(m.title) { viewMode?.wrappedValue = m }
+                    .keyboardShortcut(m.shortcut, modifiers: .command)
+            }
         }
         CommandGroup(after: .pasteboard) {
             Button("Copy for Current View") {

@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct NewMediaWriterApp: App {
+    init() { ScrollPassthrough.install() }
+
     var body: some Scene {
         DocumentGroup(newDocument: { MarkdownDocument() }) { config in
             ContentView(document: config.document, fileURL: config.fileURL)

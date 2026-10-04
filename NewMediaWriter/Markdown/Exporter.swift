@@ -36,22 +36,21 @@ enum Exporter {
     static func xPost(_ segment: String) -> Payload {
         let attributed = MarkdownRender.xAttributed(segment)
         return Payload(plain: String(attributed.characters),
-                       html: inlineHTML(attributed, paragraphs: true),
+                       html: document(inlineHTML(attributed, paragraphs: true)),
                        rich: nsAttributed(attributed, baseFont: .systemFont(ofSize: 15)))
     }
 
     static func xThread(_ text: String) -> Payload {
         let segments = MarkdownParser.threadSegments(text)
-        let posts = segments.map { xPost($0) }
-        return Payload(plain: posts.map(\.plain).joined(separator: "\n\n"),
-                       html: posts.compactMap(\.html).joined(separator: "<p>&nbsp;</p>"),
-                       rich: nil)
-    }
-
-    /// Full document as HTML so the X Article editor keeps headings, lists, quotes and code.
-    static func xArticle(_ text: String) -> Payload {
-        let blocks = MarkdownParser.parse(text)
-        return Payload(plain: MarkdownRender.plainText(text), html: html(blocks, headings: true))
+        let attributed = segments.map { MarkdownRender.xAttributed($0) }
+        let rich = NSMutableAttributedString()
+        for (i, a) in attributed.enumerated() {
+            if i > 0 { rich.append(NSAttributedString(string: "\n\n", attributes: [.font: NSFont.systemFont(ofSize: 15)])) }
+            rich.append(nsAttributed(a, baseFont: .systemFont(ofSize: 15)))
+        }
+        return Payload(plain: attributed.map { String($0.characters) }.joined(separator: "\n\n"),
+                       html: document(attributed.map { inlineHTML($0, paragraphs: true) }.joined(separator: "<p>&nbsp;</p>")),
+                       rich: rich)
     }
 
     // MARK: LinkedIn
@@ -124,8 +123,13 @@ enum Exporter {
 
     // MARK: HTML
 
+    /// Explicit UTF-8 charset: without it TextEdit & co. decode the HTML flavor as Latin-1 (“â€¢”).
+    private static func document(_ body: String) -> String {
+        "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body>\(body)</body></html>"
+    }
+
     static func html(_ blocks: [MDBlock], headings: Bool) -> String {
-        var out = "<html><body>"
+        var out = ""
         for block in blocks {
             switch block {
             case .heading(let level, let t):
@@ -144,7 +148,7 @@ enum Exporter {
                 break
             }
         }
-        return out + "</body></html>"
+        return document(out)
     }
 
     static func inlineHTML(_ attributed: AttributedString, paragraphs: Bool) -> String {
