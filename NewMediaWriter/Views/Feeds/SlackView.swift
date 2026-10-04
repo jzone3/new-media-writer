@@ -39,7 +39,12 @@ struct SlackView: View {
             }
             .padding(.top, 0)
 
-            CharacterBadge(count: MarkdownRender.plainText(text).count, limit: SlackTheme.limit).padding(16).padding(.bottom, 64)
+            HStack(spacing: 8) {
+                CopyButton(payload: { Exporter.slack(text) },
+                           alternatives: [(title: "Copy as plain mrkdwn only", payload: { Exporter.slackPlain(text) })])
+                CharacterBadge(count: MarkdownRender.plainText(text).count, limit: SlackTheme.limit)
+            }
+            .padding(16).padding(.bottom, 64)
         }
     }
 

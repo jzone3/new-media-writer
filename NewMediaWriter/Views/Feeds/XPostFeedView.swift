@@ -37,9 +37,20 @@ struct XPostFeedView: View {
                 .padding(.top, 36)
             }
 
-            CharacterBadge(count: totalCount, limit: XTheme.limit,
-                           detail: segments.count > 1 ? "\(segments.count) posts" : nil)
-                .padding(16)
+            HStack(spacing: 8) {
+                CopyButton(payload: { Exporter.xThread(text) }, alternatives: copyAlternatives)
+                CharacterBadge(count: totalCount, limit: XTheme.limit,
+                               detail: segments.count > 1 ? "\(segments.count) posts" : nil)
+            }
+            .padding(16)
+        }
+    }
+
+    private var copyAlternatives: [(title: String, payload: () -> Exporter.Payload)] {
+        let segments = self.segments
+        guard segments.count > 1 else { return [] }
+        return segments.enumerated().map { i, segment in
+            (title: "Copy post \(i + 1)", payload: { Exporter.xPost(segment) })
         }
     }
 
@@ -110,6 +121,7 @@ struct XPostCell: View {
     var isThread = false
     var isLast = true
     var index = 0
+    @State private var copied = false
 
     private var attributed: AttributedString {
         MarkdownRender.xAttributed(markdown)
@@ -132,6 +144,21 @@ struct XPostCell: View {
                         Text("·").foregroundStyle(XTheme.secondary)
                         Text("now").foregroundStyle(XTheme.secondary)
                         Spacer()
+                        if isThread {
+                            Button {
+                                Exporter.xPost(markdown).copy()
+                                copied = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
+                            } label: {
+                                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(copied ? Color.green : XTheme.secondary)
+                                    .frame(width: 20, height: 20)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .help("Copy post \(index + 1)")
+                        }
                         Image(systemName: "ellipsis").foregroundStyle(XTheme.secondary)
                     }
                     .font(.system(size: 15))

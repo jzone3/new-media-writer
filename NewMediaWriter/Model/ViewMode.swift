@@ -51,5 +51,12 @@ struct ViewCommands: Commands {
             Button("Slack") { viewMode?.wrappedValue = .slack }
                 .keyboardShortcut("4", modifiers: .command)
         }
+        CommandGroup(after: .pasteboard) {
+            Button("Copy for Current View") {
+                NotificationCenter.default.post(name: .copyForCurrentView, object: nil)
+            }
+            .keyboardShortcut("c", modifiers: [.command, .shift])
+            .disabled(viewMode == nil)
+        }
     }
 }

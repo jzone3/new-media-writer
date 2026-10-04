@@ -14,6 +14,12 @@ struct ContentView: View {
             ViewSwitcher(mode: $mode)
                 .padding(.top, 8)
                 .padding(.trailing, 12)
+
+            if mode.isEditor {
+                CopyButton(payload: { Exporter.markdown(document.text) })
+                    .padding(16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            }
         }
         .background(background)
         .ignoresSafeArea()

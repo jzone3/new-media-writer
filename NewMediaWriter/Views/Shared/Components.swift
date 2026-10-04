@@ -185,6 +185,66 @@ struct MediaGrid: View {
     }
 }
 
+/// Copies the current document in the format the active preview's composer expects.
+struct CopyButton: View {
+    let payload: () -> Exporter.Payload
+    var alternatives: [(title: String, payload: () -> Exporter.Payload)] = []
+    @State private var copied = false
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button {
+                perform(payload)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(copied ? "Copied" : "Copy")
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Copy for this view (⇧⌘C)")
+
+            if !alternatives.isEmpty {
+                Menu {
+                    ForEach(Array(alternatives.enumerated()), id: \.offset) { _, alt in
+                        Button(alt.title) { perform(alt.payload) }
+                    }
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8, weight: .bold))
+                        .frame(width: 16, height: 16)
+                        .contentShape(Rectangle())
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .padding(.leading, 4)
+            }
+        }
+        .font(.system(size: 12, weight: .medium, design: .rounded))
+        .foregroundStyle(copied ? Color.green : Color.secondary)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08)))
+        .animation(.easeOut(duration: 0.15), value: copied)
+        .onReceive(NotificationCenter.default.publisher(for: .copyForCurrentView)) { _ in perform(payload) }
+    }
+
+    private func perform(_ make: () -> Exporter.Payload) {
+        make().copy()
+        copied = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
+    }
+}
+
+extension Notification.Name {
+    static let copyForCurrentView = Notification.Name("copyForCurrentView")
+}
+
 /// "1,234 / 25,000" pill shown in the corner of every social preview.
 struct CharacterBadge: View {
     let count: Int

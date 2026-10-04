@@ -89,8 +89,11 @@ struct XArticleView: View {
                 .padding(.bottom, 60)
             }
 
-            CharacterBadge(count: MarkdownRender.plainText(text).count, limit: 100_000, detail: "\(wordCount) words")
-                .padding(16)
+            HStack(spacing: 8) {
+                CopyButton(payload: { Exporter.xArticle(text) })
+                CharacterBadge(count: MarkdownRender.plainText(text).count, limit: 100_000, detail: "\(wordCount) words")
+            }
+            .padding(16)
         }
     }
 

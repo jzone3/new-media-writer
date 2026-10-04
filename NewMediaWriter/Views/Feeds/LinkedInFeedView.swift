@@ -37,7 +37,11 @@ struct LinkedInFeedView: View {
                 .padding(.top, 44)
                 .padding(.bottom, 60)
             }
-            CharacterBadge(count: plain.count, limit: LinkedInTheme.limit).padding(16)
+            HStack(spacing: 8) {
+                CopyButton(payload: { Exporter.linkedIn(text) })
+                CharacterBadge(count: plain.count, limit: LinkedInTheme.limit)
+            }
+            .padding(16)
         }
     }
 

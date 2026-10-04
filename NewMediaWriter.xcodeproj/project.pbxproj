@@ -22,6 +22,7 @@
 		A3FFBDEABCF714BE3FEAFBEA /* LinkedInFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB150175F3B36C6838690CCF /* LinkedInFeedView.swift */; };
 		B5B9F579DBE192B22843D358 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A6B07701A0C91E8F8E6012 /* ContentView.swift */; };
 		C76258E2A058AA9F07326448 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE04E2656851672C8CFEDA1C /* SettingsView.swift */; };
+		C9348F8F3277E4FA34FCD5C7 /* Exporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FF87C4F669B04A1CE500152 /* Exporter.swift */; };
 		CEA649CE339D954664796073 /* MarkdownDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16146E3C4E132AC4C91FE796 /* MarkdownDocument.swift */; };
 		D2DBB16239A3A9A5C1CE5201 /* ViewMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6617B82F8B6BBFD62FC09B0A /* ViewMode.swift */; };
 		DAC73B4C669553B030AD79B0 /* SlackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DC38351006FCA7CFD14D557 /* SlackView.swift */; };
@@ -35,6 +36,7 @@
 		187D0356A57960AC3B94764C /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		36E754FF078AB5AE59A6B3A8 /* Profile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Profile.swift; sourceTree = "<group>"; };
 		4DC38351006FCA7CFD14D557 /* SlackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackView.swift; sourceTree = "<group>"; };
+		4FF87C4F669B04A1CE500152 /* Exporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Exporter.swift; sourceTree = "<group>"; };
 		51B35CFC028AB421D205C2A3 /* ViewSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewSwitcher.swift; sourceTree = "<group>"; };
 		6617B82F8B6BBFD62FC09B0A /* ViewMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewMode.swift; sourceTree = "<group>"; };
 		686286249900A8CAEE9FA28F /* MarkdownParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParser.swift; sourceTree = "<group>"; };
@@ -115,6 +117,7 @@
 		7E4858C3563C95D22F845DF9 /* Markdown */ = {
 			isa = PBXGroup;
 			children = (
+				4FF87C4F669B04A1CE500152 /* Exporter.swift */,
 				BE9C69EB5F31A2A4EF5EB2D6 /* MarkdownInline.swift */,
 				686286249900A8CAEE9FA28F /* MarkdownParser.swift */,
 				BAB96E1EE1DED5511665CC62 /* MarkdownRender.swift */,
@@ -231,6 +234,7 @@
 				82559E21F12A415D2DA9FD5E /* Components.swift in Sources */,
 				B5B9F579DBE192B22843D358 /* ContentView.swift in Sources */,
 				977D0668EA51D777232DD7B1 /* EditorTextView.swift in Sources */,
+				C9348F8F3277E4FA34FCD5C7 /* Exporter.swift in Sources */,
 				69DD07C9ABFD623D17783EF4 /* ImageCache.swift in Sources */,
 				A3FFBDEABCF714BE3FEAFBEA /* LinkedInFeedView.swift in Sources */,
 				CEA649CE339D954664796073 /* MarkdownDocument.swift in Sources */,
