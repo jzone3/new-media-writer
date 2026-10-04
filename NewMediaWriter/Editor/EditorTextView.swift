@@ -1,0 +1,358 @@
+import AppKit
+import UniformTypeIdentifiers
+
+/// NSTextView that keeps a centred reading column, hides markdown syntax away from the cursor,
+/// renders images below their `![]()` line and stores pasted/dropped images in `assets/`.
+final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDelegate {
+    let styler = MarkdownStyler()
+    var documentURL: URL?
+    var onImageInserted: (() -> Void)?
+
+    var maxColumnWidth: CGFloat = 720
+    var topInset: CGFloat = 56
+    var hideMarkers = true { didSet { invalidateAllGlyphs() } }
+
+    private var activeParagraph = NSRange(location: 0, length: 0)
+    private var imageViews: [NSRange: NSImageView] = [:]
+    private var lastColumnWidth: CGFloat = 0
+
+    override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
+        super.init(frame: frameRect, textContainer: container)
+        commonInit()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        commonInit()
+    }
+
+    private func commonInit() {
+        // Accessing layoutManager forces TextKit 1, which we rely on for glyph hiding.
+        guard let layoutManager, let textStorage else { return }
+        layoutManager.delegate = self
+        layoutManager.allowsNonContiguousLayout = false
+        textStorage.delegate = self
+
+        isRichText = true
+        importsGraphics = false
+        allowsUndo = true
+        isAutomaticQuoteSubstitutionEnabled = false
+        isAutomaticDashSubstitutionEnabled = false
+        isAutomaticTextReplacementEnabled = false
+        isAutomaticLinkDetectionEnabled = false
+        isAutomaticDataDetectionEnabled = false
+        isContinuousSpellCheckingEnabled = true
+        isGrammarCheckingEnabled = false
+        usesFontPanel = false
+        usesFindBar = true
+        isIncrementalSearchingEnabled = true
+        smartInsertDeleteEnabled = false
+        drawsBackground = false
+        insertionPointColor = .controlAccentColor
+        textContainer?.widthTracksTextView = false
+        textContainer?.lineFragmentPadding = 0
+        isHorizontallyResizable = false
+        isVerticallyResizable = true
+        autoresizingMask = [.width]
+        minSize = NSSize(width: 0, height: 0)
+        maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        styler.imageHeight = { [weak self] path in self?.displayHeight(forImagePath: path) ?? 0 }
+    }
+
+    // MARK: - Column layout
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        updateColumn(width: newSize.width)
+        layoutImages()
+    }
+
+    private func updateColumn(width: CGFloat) {
+        let column = min(max(width - 96, 240), maxColumnWidth)
+        let inset = max((width - column) / 2, 0)
+        textContainerInset = NSSize(width: inset, height: topInset)
+        textContainer?.containerSize = NSSize(width: column, height: CGFloat.greatestFiniteMagnitude)
+        if abs(column - lastColumnWidth) > 0.5 {
+            lastColumnWidth = column
+            if let textStorage, textStorage.length > 0 {
+                styler.restyle(textStorage)
+            }
+        }
+    }
+
+    var columnWidth: CGFloat { textContainer?.containerSize.width ?? maxColumnWidth }
+
+    override var textContainerOrigin: NSPoint {
+        var origin = super.textContainerOrigin
+        origin.x = textContainerInset.width
+        return origin
+    }
+
+    // MARK: - Styling pipeline
+
+    func textStorage(_ textStorage: NSTextStorage, willProcessEditing editedMask: NSTextStorageEditActions, range editedRange: NSRange, changeInLength delta: Int) {
+        guard editedMask.contains(.editedCharacters) else { return }
+        styler.restyle(textStorage)
+    }
+
+    override func didChangeText() {
+        super.didChangeText()
+        updateActiveParagraph(invalidate: true)
+        needsImageLayout = true
+    }
+
+    override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
+        super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
+        updateActiveParagraph(invalidate: true)
+    }
+
+    private func updateActiveParagraph(invalidate: Bool) {
+        guard let textStorage else { return }
+        let string = textStorage.string as NSString
+        let sel = selectedRange()
+        let loc = min(sel.location, string.length)
+        var newRange = string.length == 0 ? NSRange(location: 0, length: 0) : string.paragraphRange(for: NSRange(location: loc, length: 0))
+        if sel.length > 0 {
+            let end = string.paragraphRange(for: NSRange(location: min(sel.location + sel.length, string.length), length: 0))
+            newRange = NSUnionRange(newRange, end)
+        }
+        guard newRange != activeParagraph else { return }
+        let old = activeParagraph
+        activeParagraph = newRange
+        if invalidate {
+            invalidateGlyphs(in: old)
+            invalidateGlyphs(in: newRange)
+        }
+    }
+
+    private func invalidateGlyphs(in range: NSRange) {
+        guard let layoutManager, let textStorage else { return }
+        let clamped = NSIntersectionRange(range, NSRange(location: 0, length: textStorage.length))
+        guard clamped.length > 0 else { return }
+        layoutManager.invalidateGlyphs(forCharacterRange: clamped, changeInLength: 0, actualCharacterRange: nil)
+        layoutManager.invalidateLayout(forCharacterRange: clamped, actualCharacterRange: nil)
+    }
+
+    private func invalidateAllGlyphs() {
+        guard let textStorage else { return }
+        invalidateGlyphs(in: NSRange(location: 0, length: textStorage.length))
+    }
+
+    // MARK: - NSLayoutManagerDelegate: hide syntax markers
+
+    func layoutManager(_ layoutManager: NSLayoutManager, shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>, properties props: UnsafePointer<NSLayoutManager.GlyphProperty>, characterIndexes charIndexes: UnsafePointer<Int>, font aFont: NSFont, forGlyphRange glyphRange: NSRange) -> Int {
+        guard hideMarkers, let storage = layoutManager.textStorage else { return 0 }
+        var newProps = Array(UnsafeBufferPointer(start: props, count: glyphRange.length))
+        var changed = false
+        for i in 0..<glyphRange.length {
+            let charIndex = charIndexes[i]
+            guard charIndex < storage.length else { continue }
+            if NSLocationInRange(charIndex, activeParagraph) { continue }
+            if storage.attribute(.mdMarker, at: charIndex, effectiveRange: nil) != nil {
+                newProps[i] = .null
+                changed = true
+            }
+        }
+        guard changed else { return 0 }
+        newProps.withUnsafeBufferPointer { buf in
+            layoutManager.setGlyphs(glyphs, properties: buf.baseAddress!, characterIndexes: charIndexes, font: aFont, forGlyphRange: glyphRange)
+        }
+        return glyphRange.length
+    }
+
+    func layoutManager(_ layoutManager: NSLayoutManager, didCompleteLayoutFor textContainer: NSTextContainer?, atEnd layoutFinishedFlag: Bool) {
+        if layoutFinishedFlag { layoutImages() }
+    }
+
+    // MARK: - Decorations (code background, quote bars, rules)
+
+    override func drawBackground(in rect: NSRect) {
+        super.drawBackground(in: rect)
+        guard let layoutManager, let textContainer, let textStorage, !styler.raw else { return }
+        let origin = textContainerOrigin
+        let full = NSRange(location: 0, length: textStorage.length)
+
+        textStorage.enumerateAttribute(.mdQuote, in: full) { value, range, _ in
+            guard value != nil else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            var r = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+            r.origin.x = origin.x + 4
+            r.origin.y += origin.y
+            r.size.width = 3
+            styler.theme.secondary.withAlphaComponent(0.5).setFill()
+            NSBezierPath(roundedRect: r, xRadius: 1.5, yRadius: 1.5).fill()
+        }
+
+        textStorage.enumerateAttribute(.mdRule, in: full) { value, range, _ in
+            guard value != nil, !NSLocationInRange(range.location, activeParagraph) else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            var r = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
+            r.origin.y += origin.y
+            let y = r.midY
+            let line = NSRect(x: origin.x, y: y, width: textContainer.containerSize.width, height: 1)
+            styler.theme.secondary.withAlphaComponent(0.35).setFill()
+            NSBezierPath(rect: line).fill()
+        }
+
+        textStorage.enumerateAttribute(.mdCodeBackground, in: full) { value, range, _ in
+            guard value != nil else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let isBlock = (textStorage.string as NSString).paragraphRange(for: range) == range
+                || (textStorage.string as NSString).paragraphRange(for: range).length - range.length <= 1
+            var r = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+            r.origin.x += origin.x
+            r.origin.y += origin.y
+            if isBlock {
+                r.origin.x = origin.x - 12
+                r.size.width = textContainer.containerSize.width + 24
+                let fill = NSBezierPath(rect: r)
+                styler.theme.codeBackground.setFill()
+                fill.fill()
+            } else {
+                r = r.insetBy(dx: -3, dy: 1)
+                let fill = NSBezierPath(roundedRect: r, xRadius: 4, yRadius: 4)
+                styler.theme.codeBackground.setFill()
+                fill.fill()
+            }
+        }
+    }
+
+    // MARK: - Images
+
+    private var needsImageLayout = false
+
+    func displayHeight(forImagePath path: String) -> CGFloat {
+        guard let url = ImagePathResolver.resolve(path, relativeTo: documentURL),
+              let image = ImageCache.shared.image(for: url, onLoad: { [weak self] in self?.restyleAndRelayout() }) else {
+            return 0
+        }
+        let size = image.size
+        guard size.width > 0, size.height > 0 else { return 0 }
+        let width = min(size.width, columnWidth)
+        let height = width * size.height / size.width
+        return min(height, 480)
+    }
+
+    func restyleAndRelayout() {
+        guard let textStorage else { return }
+        styler.restyle(textStorage)
+        needsImageLayout = true
+        layoutImages()
+    }
+
+    private func layoutImages() {
+        guard let layoutManager, let textContainer, let textStorage else { return }
+        let origin = textContainerOrigin
+        var seen: Set<NSRange> = []
+        let full = NSRange(location: 0, length: textStorage.length)
+
+        textStorage.enumerateAttribute(.mdImage, in: full) { value, range, _ in
+            guard let path = value as? String else { return }
+            guard let url = ImagePathResolver.resolve(path, relativeTo: documentURL),
+                  let image = ImageCache.shared.image(for: url) else { return }
+            let height = displayHeight(forImagePath: path)
+            guard height > 0 else { return }
+            let width = height * image.size.width / image.size.height
+
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            var line = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+            if line.height == 0 {
+                line = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
+            }
+            let frame = NSRect(x: origin.x, y: origin.y + line.maxY + 8, width: width, height: height)
+
+            let view: NSImageView
+            if let existing = imageViews[range] {
+                view = existing
+            } else {
+                view = PassThroughImageView()
+                view.imageScaling = .scaleProportionallyUpOrDown
+                view.wantsLayer = true
+                view.layer?.cornerRadius = 8
+                view.layer?.masksToBounds = true
+                addSubview(view)
+                imageViews[range] = view
+            }
+            view.image = image
+            if view.frame != frame { view.frame = frame }
+            seen.insert(range)
+        }
+
+        for (range, view) in imageViews where !seen.contains(range) {
+            view.removeFromSuperview()
+            imageViews[range] = nil
+        }
+        needsImageLayout = false
+    }
+
+    // MARK: - Paste & drop
+
+    override var readablePasteboardTypes: [NSPasteboard.PasteboardType] {
+        [.fileURL, .png, .tiff, .string]
+    }
+
+    override var acceptableDragTypes: [NSPasteboard.PasteboardType] {
+        [.fileURL, .png, .tiff, .string]
+    }
+
+    override func readSelection(from pboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
+        if insertImages(from: pboard) { return true }
+        if type == .string, let s = pboard.string(forType: .string) {
+            insertText(s, replacementRange: selectedRange())
+            return true
+        }
+        return super.readSelection(from: pboard, type: type)
+    }
+
+    override func paste(_ sender: Any?) {
+        if insertImages(from: .general) { return }
+        pasteAsPlainText(sender)
+    }
+
+    @discardableResult
+    private func insertImages(from pboard: NSPasteboard) -> Bool {
+        let store = ImageStore(documentURL: documentURL)
+        var paths: [String] = []
+
+        if let urls = pboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
+            for url in urls {
+                guard let type = UTType(filenameExtension: url.pathExtension), type.conforms(to: .image) else { return false }
+                if let p = try? store.store(fileURL: url) { paths.append(p) }
+            }
+        } else if let data = pboard.data(forType: .png) {
+            if let p = try? store.store(data: data, preferredName: Self.timestampName(), ext: "png") { paths.append(p) }
+        } else if let data = pboard.data(forType: .tiff), let rep = NSBitmapImageRep(data: data), let png = rep.representation(using: .png, properties: [:]) {
+            if let p = try? store.store(data: png, preferredName: Self.timestampName(), ext: "png") { paths.append(p) }
+        }
+
+        guard !paths.isEmpty else { return false }
+        insertImageMarkdown(paths: paths)
+        return true
+    }
+
+    func insertImageMarkdown(paths: [String]) {
+        let string = self.string as NSString
+        let sel = selectedRange()
+        var prefix = ""
+        if sel.location > 0, string.character(at: sel.location - 1) != 10 { prefix = "\n" }
+        let lines = paths.map { path -> String in
+            let name = (path as NSString).lastPathComponent
+            let alt = ((name.removingPercentEncoding ?? name) as NSString).deletingPathExtension
+            return "![\(alt)](\(path))"
+        }
+        var suffix = "\n"
+        if sel.location + sel.length < string.length, string.character(at: sel.location + sel.length) == 10 { suffix = "" }
+        insertText(prefix + lines.joined(separator: "\n") + suffix, replacementRange: sel)
+        onImageInserted?()
+    }
+
+    private static func timestampName() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd-HHmmss"
+        return "image-" + f.string(from: Date())
+    }
+}
+
+private final class PassThroughImageView: NSImageView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
