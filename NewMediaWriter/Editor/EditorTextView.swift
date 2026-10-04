@@ -5,7 +5,9 @@ import UniformTypeIdentifiers
 /// renders images below their `![]()` line and stores pasted/dropped images in `assets/`.
 final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDelegate {
     let styler = MarkdownStyler()
-    var documentURL: URL?
+    var documentURL: URL? {
+        didSet { if documentURL != oldValue, textStorage?.length ?? 0 > 0 { restyleAndRelayout() } }
+    }
     var onImageInserted: (() -> Void)?
 
     var maxColumnWidth: CGFloat = 720
@@ -99,6 +101,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         super.didChangeText()
         updateActiveParagraph(invalidate: true)
         needsImageLayout = true
+        DispatchQueue.main.async { [weak self] in self?.layoutImages() }
     }
 
     override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
@@ -240,11 +243,28 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         layoutImages()
     }
 
+    private var isLayingOutImages = false
+
     private func layoutImages() {
-        guard let layoutManager, let textContainer, let textStorage else { return }
+        guard !isLayingOutImages, let layoutManager, let textContainer, let textStorage else { return }
+        isLayingOutImages = true
+        defer { isLayingOutImages = false }
+        layoutManager.ensureLayout(for: textContainer)
         let origin = textContainerOrigin
         var seen: Set<NSRange> = []
         let full = NSRange(location: 0, length: textStorage.length)
+
+        var spacingStale = false
+        textStorage.enumerateAttribute(.mdImage, in: full) { value, range, _ in
+            guard let path = value as? String else { return }
+            let height = displayHeight(forImagePath: path)
+            let spacing = (textStorage.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle)?.paragraphSpacing ?? 0
+            if abs(spacing - (height + 16)) > 0.5 { spacingStale = true }
+        }
+        if spacingStale {
+            styler.restyle(textStorage)
+            layoutManager.ensureLayout(for: textContainer)
+        }
 
         textStorage.enumerateAttribute(.mdImage, in: full) { value, range, _ in
             guard let path = value as? String else { return }

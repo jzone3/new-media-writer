@@ -116,36 +116,37 @@ struct MediaGrid: View {
             case 0: EmptyView()
             case 1:
                 if let aspect = singleAspect {
-                    DocumentImage(url: items[0]).aspectRatio(aspect, contentMode: .fill)
+                    Tile(url: items[0], aspect: aspect)
                 } else {
                     SingleImage(url: items[0])
                 }
             case 2:
                 HStack(spacing: spacing) {
-                    DocumentImage(url: items[0]).aspectRatio(0.9, contentMode: .fill).clipped()
-                    DocumentImage(url: items[1]).aspectRatio(0.9, contentMode: .fill).clipped()
+                    Tile(url: items[0], aspect: 0.9)
+                    Tile(url: items[1], aspect: 0.9)
                 }
             case 3:
                 HStack(spacing: spacing) {
-                    DocumentImage(url: items[0]).aspectRatio(0.9, contentMode: .fill).clipped()
+                    Tile(url: items[0], aspect: 0.9)
                     VStack(spacing: spacing) {
-                        DocumentImage(url: items[1]).aspectRatio(1.8, contentMode: .fill).clipped()
-                        DocumentImage(url: items[2]).aspectRatio(1.8, contentMode: .fill).clipped()
+                        Tile(url: items[1], aspect: 1.8)
+                        Tile(url: items[2], aspect: 1.8)
                     }
                 }
             default:
                 VStack(spacing: spacing) {
                     HStack(spacing: spacing) {
-                        DocumentImage(url: items[0]).aspectRatio(1.8, contentMode: .fill).clipped()
-                        DocumentImage(url: items[1]).aspectRatio(1.8, contentMode: .fill).clipped()
+                        Tile(url: items[0], aspect: 1.8)
+                        Tile(url: items[1], aspect: 1.8)
                     }
                     HStack(spacing: spacing) {
-                        DocumentImage(url: items[2]).aspectRatio(1.8, contentMode: .fill).clipped()
-                        DocumentImage(url: items[3]).aspectRatio(1.8, contentMode: .fill).clipped()
+                        Tile(url: items[2], aspect: 1.8)
+                        Tile(url: items[3], aspect: 1.8)
                     }
                 }
             }
         }
+        .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay {
             if showsBorder {
@@ -155,13 +156,25 @@ struct MediaGrid: View {
         }
     }
 
+    /// Fixed-aspect cell: the image fills and is clipped, never dictating the cell size.
+    private struct Tile: View {
+        let url: URL?
+        let aspect: CGFloat
+        var body: some View {
+            Color.clear
+                .aspectRatio(aspect, contentMode: .fit)
+                .overlay { DocumentImage(url: url) }
+                .clipped()
+        }
+    }
+
     private struct SingleImage: View {
         let url: URL?
         var body: some View {
             if let url, let image = ImageCache.shared.image(for: url), image.size.height > 0 {
                 let ratio = image.size.width / image.size.height
                 if ratio < 0.8 {
-                    DocumentImage(url: url).aspectRatio(0.8, contentMode: .fill).clipped()
+                    Tile(url: url, aspect: 0.8)
                 } else {
                     Image(nsImage: image).resizable().aspectRatio(ratio, contentMode: .fit)
                 }
