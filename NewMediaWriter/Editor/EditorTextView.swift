@@ -152,7 +152,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
             guard charIndex < storage.length else { continue }
             if NSLocationInRange(charIndex, activeParagraph) { continue }
             if storage.attribute(.mdMarker, at: charIndex, effectiveRange: nil) != nil {
-                newProps[i] = .null
+                newProps[i] = storage.attribute(.mdKeepLine, at: charIndex, effectiveRange: nil) != nil ? .controlCharacter : .null
                 changed = true
             }
         }
@@ -161,6 +161,19 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
             layoutManager.setGlyphs(glyphs, properties: buf.baseAddress!, characterIndexes: charIndexes, font: aFont, forGlyphRange: glyphRange)
         }
         return glyphRange.length
+    }
+
+    func layoutManager(_ layoutManager: NSLayoutManager, shouldUse action: NSLayoutManager.ControlCharacterAction, forControlCharacterAt charIndex: Int) -> NSLayoutManager.ControlCharacterAction {
+        if let storage = layoutManager.textStorage, charIndex < storage.length,
+           storage.attribute(.mdKeepLine, at: charIndex, effectiveRange: nil) != nil,
+           !NSLocationInRange(charIndex, activeParagraph) {
+            return .whitespace
+        }
+        return action
+    }
+
+    func layoutManager(_ layoutManager: NSLayoutManager, boundingBoxForControlGlyphAt glyphIndex: Int, for textContainer: NSTextContainer, proposedLineFragment proposedRect: NSRect, glyphPosition: NSPoint, characterIndex charIndex: Int) -> NSRect {
+        NSRect(x: glyphPosition.x, y: proposedRect.minY, width: 0, height: proposedRect.height)
     }
 
     func layoutManager(_ layoutManager: NSLayoutManager, didCompleteLayoutFor textContainer: NSTextContainer?, atEnd layoutFinishedFlag: Bool) {

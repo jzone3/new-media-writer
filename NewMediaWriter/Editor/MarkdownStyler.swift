@@ -8,6 +8,8 @@ extension NSAttributedString.Key {
     static let mdCodeBackground = NSAttributedString.Key("mdCodeBackground")
     static let mdQuote = NSAttributedString.Key("mdQuote")
     static let mdRule = NSAttributedString.Key("mdRule")
+    /// First character of a fully hidden line; laid out as zero-width whitespace so the line keeps its height.
+    static let mdKeepLine = NSAttributedString.Key("mdKeepLine")
 }
 
 struct EditorTheme {
@@ -282,14 +284,12 @@ final class MarkdownStyler {
         storage.addAttribute(.foregroundColor, value: theme.secondary, range: range)
     }
 
-    /// Hides a whole line but keeps its first glyph (drawn clear) so the typesetter still
+    /// Hides a whole line but keeps its first glyph as zero-width whitespace so the typesetter still
     /// produces a real line fragment; an all-null-glyph paragraph collapses into the previous line.
     private func hiddenLine(_ storage: NSTextStorage, _ range: NSRange) {
         guard range.length > 0 else { return }
-        storage.addAttribute(.foregroundColor, value: NSColor.clear, range: NSRange(location: range.location, length: 1))
-        if range.length > 1 {
-            marker(storage, NSRange(location: range.location + 1, length: range.length - 1))
-        }
+        marker(storage, range)
+        storage.addAttribute(.mdKeepLine, value: true, range: NSRange(location: range.location, length: 1))
     }
 
     private func paragraph(_ storage: NSTextStorage, _ range: NSRange, _ edit: (NSMutableParagraphStyle) -> Void) {
