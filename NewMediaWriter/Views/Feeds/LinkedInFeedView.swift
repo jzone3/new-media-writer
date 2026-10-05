@@ -159,6 +159,7 @@ struct LinkedInPostCard: View {
         }
         .background(LinkedInTheme.card, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(LinkedInTheme.border))
+        .imageDrop(documentURL: baseURL, markdown: markdown, accent: LinkedInTheme.blue, cornerRadius: 8, onEdit: onEdit)
     }
 
     private var header: some View {

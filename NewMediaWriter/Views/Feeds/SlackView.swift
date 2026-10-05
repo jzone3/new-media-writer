@@ -215,6 +215,7 @@ struct SlackMessage: View {
         }
         .padding(.horizontal, 20).padding(.vertical, 8)
         .background(Color.adaptive(light: 0xF8F8F8, dark: 0x222529).opacity(0.0))
+        .imageDrop(documentURL: baseURL, markdown: markdown, accent: SlackTheme.sidebarActive, cornerRadius: 8, onEdit: onEdit)
     }
 
     private func reactionPill(_ emoji: String, _ count: Int) -> some View {

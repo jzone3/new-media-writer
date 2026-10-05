@@ -280,6 +280,7 @@ struct XPostCell: View {
             }
         }
         .background(Color.clear)
+        .imageDrop(documentURL: baseURL, markdown: markdown, accent: XTheme.blue, onEdit: onEdit)
     }
 
     private var actionBar: some View {
