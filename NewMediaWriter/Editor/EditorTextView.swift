@@ -3,6 +3,13 @@ import UniformTypeIdentifiers
 
 /// NSTextView that keeps a centred reading column, hides markdown syntax away from the cursor,
 /// renders images below their `![]()` line and stores pasted/dropped images in `assets/`.
+/// How the timeline fold is drawn; nil colours fall back to the theme's secondary colour.
+struct FoldMarkerStyle {
+    var label = "…more  ·  fold"
+    var labelColor: NSColor? = nil
+    var lineColor: NSColor? = nil
+}
+
 final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDelegate {
     let emojiPopup = EmojiPopup()
 
@@ -59,8 +66,9 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     var fillsWidth = false
     /// Feed cards show media in their own grid, so the editor skips inline image rendering.
     var showsImages = true
-    /// Draws a dashed "…more" fold line after this many visible (non-marker) characters.
-    var foldAfterVisibleCharacters: Int? { didSet { needsDisplay = true } }
+    /// Draws a dashed fold line + label after this many visible (non-marker) characters.
+    var foldAfterVisibleCharacters: Int? { didSet { foldIndexCache = nil; needsDisplay = true } }
+    var foldStyle = FoldMarkerStyle() { didSet { needsDisplay = true } }
     /// Embedded editors only reveal syntax in the cursor's paragraph while they have keyboard focus.
     var revealsMarkersOnlyWhenFocused = false
 
@@ -170,7 +178,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         super.didChangeText()
         if let textStorage { styler.restyle(textStorage) }
         updateActiveParagraph(invalidate: true)
-        if foldAfterVisibleCharacters != nil { needsDisplay = true }
+        if foldAfterVisibleCharacters != nil { relayoutMovedFold() }
         needsImageLayout = true
         // Deferred: the popup queries layout, which must not happen while the edit is still being processed.
         DispatchQueue.main.async { [weak self] in self?.layoutImages(); self?.updateEmojiSuggestions() }
@@ -327,20 +335,30 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         }
     }
 
-    // MARK: - Fold marker (LinkedIn "…more")
+    // MARK: - Fold marker (LinkedIn "…more", X "Show more")
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         drawFoldMarker()
     }
 
-    private static let foldLabel = "…more  ·  fold" as NSString
+    private var foldLabel: NSString { foldStyle.label as NSString }
     private var foldLabelAttributes: [NSAttributedString.Key: Any] {
-        [.font: NSFont.systemFont(ofSize: 10, weight: .semibold), .foregroundColor: styler.theme.secondary]
+        [.font: NSFont.systemFont(ofSize: 10, weight: .semibold),
+         .foregroundColor: foldStyle.labelColor ?? styler.theme.secondary]
     }
 
     /// Character index where the fold falls, if the text runs past `foldAfterVisibleCharacters`.
     private func foldCharacterIndex() -> Int? {
+        if let cached = foldIndexCache { return cached }
+        let index = computeFoldCharacterIndex()
+        foldIndexCache = .some(index)
+        return index
+    }
+
+    private var foldIndexCache: Int?? = nil
+
+    private func computeFoldCharacterIndex() -> Int? {
         guard let fold = foldAfterVisibleCharacters, fold > 0, let textStorage, textStorage.length > 0 else { return nil }
         var visible = 0
         var i = 0
@@ -356,12 +374,38 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         return nil
     }
 
+    /// Height reserved below the folded line for the dashed rule and its label.
+    private var foldMarkerHeight: CGFloat { 6 + foldLabel.size(withAttributes: foldLabelAttributes).height }
+
+    /// The folded line gets extra height so the marker sits between lines instead of over the next one.
+    func layoutManager(_ layoutManager: NSLayoutManager, shouldSetLineFragmentRect lineFragmentRect: UnsafeMutablePointer<NSRect>, lineFragmentUsedRect: UnsafeMutablePointer<NSRect>, baselineOffset: UnsafeMutablePointer<CGFloat>, in textContainer: NSTextContainer, forGlyphRange glyphRange: NSRange) -> Bool {
+        guard let foldIndex = foldCharacterIndex() else { return false }
+        let chars = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+        guard NSLocationInRange(foldIndex, chars) else { return false }
+        lineFragmentRect.pointee.size.height += foldMarkerHeight
+        return true
+    }
+
+    /// After an edit the fold may sit on a different line; relayout both so only the new one carries the extra height.
+    private func relayoutMovedFold() {
+        guard let layoutManager, let textStorage else { return }
+        let old = foldIndexCache ?? nil
+        foldIndexCache = nil
+        let new = foldCharacterIndex()
+        needsDisplay = true
+        guard old != new else { return }
+        let string = textStorage.string as NSString
+        for index in [old, new].compactMap({ $0 }) where index < string.length {
+            layoutManager.invalidateLayout(forCharacterRange: string.paragraphRange(for: NSRange(location: index, length: 0)), actualCharacterRange: nil)
+        }
+    }
+
     /// Bottom edge of the fold label in text-container coordinates, so hosts sizing to content can reserve room for it.
     var foldMarkerBottom: CGFloat? {
         guard let layoutManager, let foldIndex = foldCharacterIndex() else { return nil }
         let glyph = layoutManager.glyphIndexForCharacter(at: foldIndex)
         let line = layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
-        return line.maxY + 4 + Self.foldLabel.size(withAttributes: foldLabelAttributes).height
+        return line.maxY + 4 + foldLabel.size(withAttributes: foldLabelAttributes).height
     }
 
     private func drawFoldMarker() {
@@ -379,12 +423,12 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         path.line(to: NSPoint(x: origin.x + width, y: y))
         path.lineWidth = 1
         path.setLineDash([4, 4], count: 2, phase: 0)
-        styler.theme.secondary.withAlphaComponent(0.7).setStroke()
+        (foldStyle.lineColor ?? styler.theme.secondary.withAlphaComponent(0.7)).setStroke()
         path.stroke()
 
         let attrs = foldLabelAttributes
-        let size = Self.foldLabel.size(withAttributes: attrs)
-        Self.foldLabel.draw(at: NSPoint(x: origin.x + width - size.width, y: y + 2), withAttributes: attrs)
+        let size = foldLabel.size(withAttributes: attrs)
+        foldLabel.draw(at: NSPoint(x: origin.x + width - size.width, y: y + 2), withAttributes: attrs)
     }
 
     // MARK: - Images
@@ -406,6 +450,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     func restyleAndRelayout() {
         guard let textStorage else { return }
         styler.restyle(textStorage)
+        foldIndexCache = nil
         needsImageLayout = true
         layoutImages()
     }
