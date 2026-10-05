@@ -3,9 +3,9 @@
 
 The window is WIDTH x HEIGHT points (see scripts/build-dmg.sh, which positions the app icon and the
 Applications link on either side of the arrow drawn here). Dark ASCII field (same look as the share card
-and launch video) with a white arrow; a darker pocket behind the icons keeps them legible.
+and launch video) with a white card behind the icon row: Finder always draws icon labels in black, so the card
+is what keeps "New Media Writer" / "Applications" readable, and it gives the arrow a quiet place to sit.
 """
-import math
 import os
 import random
 from PIL import Image, ImageDraw, ImageFont
@@ -14,11 +14,12 @@ WIDTH, HEIGHT = 660, 400
 ARROW_Y = 180          # vertical centre of the icons (build-dmg.sh uses the same value)
 ARROW_LEN, HEAD, STROKE = 72, 18, 3
 BG = (13, 13, 13)
+CARD = (70, 92, 590, 296)   # rounded white card; icons (128pt) + Finder labels fall inside it
+CARD_RADIUS = 18
 CW, CH = 9, 14         # glyph cell (points)
 RAMP = ". . . : : - = + * # % @ 8 0 B M".split()
 OUT = os.path.join(os.path.dirname(__file__), "..", "dmg")
 FONT = "/System/Library/Fonts/Menlo.ttc"
-LABEL_FONT = "/System/Library/Fonts/SFNS.ttf"
 
 
 def value_noise(cols, rows, seed, cell=6):
@@ -46,24 +47,17 @@ def render(scale):
                 continue
             ch = RAMP[min(len(RAMP) - 1, int(n * len(RAMP)))]
             x, y = c * CW, r * CH
-            # darker pocket around the icon row so the app icon / folder read clearly
-            dx, dy = (x - WIDTH / 2) / (WIDTH / 2), (y - ARROW_Y) / 150
-            pocket = max(0.0, 1 - math.sqrt(dx * dx + dy * dy))
-            a = (0.18 + 0.55 * n) * (1 - 0.75 * pocket)
+            a = 0.18 + 0.55 * n
             v = int(13 + a * 215)
             d.text((x * scale, y * scale), ch, font=font, fill=(v, v, v))
+    d.rounded_rectangle([v * scale for v in CARD], radius=CARD_RADIUS * scale, fill="white",
+                        outline=(225, 225, 225), width=scale)
     cx, cy = WIDTH / 2, ARROW_Y
     x0, x1 = (cx - ARROW_LEN / 2) * scale, (cx + ARROW_LEN / 2) * scale
     y, w = cy * scale, STROKE * scale
     for pts in ([(x0, y), (x1, y)], [(x1 - HEAD * scale, y - HEAD * scale), (x1, y)], [(x1 - HEAD * scale, y + HEAD * scale), (x1, y)]):
-        d.line(pts, fill="white", width=w)
-    d.ellipse([x1 - w / 2, y - w / 2, x1 + w / 2, y + w / 2], fill="white")
-    # Finder draws icon labels in black regardless of the background, which is unreadable here; paint white
-    # labels at the same spots (positions mirror APP_X / APPS_X / ICON in scripts/build-dmg.sh).
-    label = ImageFont.truetype(LABEL_FONT, int(12 * scale))
-    for text, lx in (("New Media Writer", 165), ("Applications", 495)):
-        tw = d.textlength(text, font=label)
-        d.text((lx * scale - tw / 2, (ARROW_Y + 64 + 7) * scale), text, font=label, fill="white")
+        d.line(pts, fill="black", width=w)
+    d.ellipse([x1 - w / 2, y - w / 2, x1 + w / 2, y + w / 2], fill="black")
     return img
 
 
