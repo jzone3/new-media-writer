@@ -30,8 +30,8 @@ struct Profile {
 
 /// Reads the profile from AppStorage so every preview updates live when Settings change.
 struct ProfileReader<Content: View>: View {
-    @AppStorage(ProfileKeys.name) private var name = "Your Name"
-    @AppStorage(ProfileKeys.handle) private var handle = "yourhandle"
+    @AppStorage(ProfileKeys.name) private var name = "Test Account"
+    @AppStorage(ProfileKeys.handle) private var handle = "testaccount"
     @AppStorage(ProfileKeys.headline) private var headline = "Builder · Writer"
     @AppStorage(ProfileKeys.avatarPath) private var avatarPath = ""
     @AppStorage(ProfileKeys.slackChannel) private var slackChannel = "general"
