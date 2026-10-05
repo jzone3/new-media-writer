@@ -28,8 +28,9 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         super.viewWillMove(toWindow: newWindow)
     }
 
-    /// The document editor claims keyboard focus when it appears (new window, view switch) so typing and ⌘V
-    /// work without a click first; embedded feed-card editors leave focus alone.
+    /// The editor claims keyboard focus when it appears (new window, view switch) so typing and ⌘V work without
+    /// a click first. Set on the document editor and on each feed's primary post editor; extra thread posts
+    /// only take it when they were just added.
     var takesFocusOnAppear = false
 
     override func viewDidMoveToWindow() {

@@ -187,7 +187,8 @@ struct SlackMessage: View {
                     Text(profile.name).font(.system(size: 15, weight: .black)).foregroundStyle(SlackTheme.text)
                     Text(Date(), style: .time).font(.system(size: 12)).foregroundStyle(SlackTheme.secondary)
                 }
-                PostEditor(text: markdown, theme: SlackTheme.editorTheme, documentURL: baseURL, onChange: onEdit)
+                PostEditor(text: markdown, theme: SlackTheme.editorTheme, documentURL: baseURL,
+                           takesFocusOnAppear: true, onChange: onEdit)
                     .overlay(alignment: .topLeading) {
                         if markdown.isEmpty {
                             Text("Message #\(profile.slackChannel)").font(.system(size: 15)).foregroundStyle(SlackTheme.secondary)
