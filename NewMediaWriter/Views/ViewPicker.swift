@@ -84,7 +84,13 @@ struct ViewPicker: View {
             .shadow(color: .black.opacity(0.25), radius: 24, y: 8)
             .padding(.top, 72)
         }
-        .onAppear { query = ""; selection = 0; focused = true }
+        .onAppear {
+            query = ""
+            selection = 0
+            // The editor's NSTextView keeps first responder otherwise, so keystrokes would edit the document.
+            NSApp.keyWindow?.makeFirstResponder(nil)
+            DispatchQueue.main.async { focused = true }
+        }
         .onChange(of: query) { _, _ in selection = 0 }
     }
 
