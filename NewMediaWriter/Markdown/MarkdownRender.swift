@@ -15,7 +15,7 @@ enum MarkdownRender {
                 a.inlinePresentationIntent = .stronglyEmphasized
                 piece = a
             case .paragraph(let t):
-                piece = MarkdownInline.attributed(t.replacingOccurrences(of: "\n", with: " "))
+                piece = MarkdownInline.attributed(t)
             case .quote(let lines):
                 piece = MarkdownInline.attributed(lines.map { "“\($0)”" }.joined(separator: "\n"))
             case .code(_, let code):
@@ -47,7 +47,7 @@ enum MarkdownRender {
         for block in blocks {
             switch block {
             case .heading(_, let t): parts.append(MarkdownInline.plain(t))
-            case .paragraph(let t): parts.append(MarkdownInline.plain(t.replacingOccurrences(of: "\n", with: " ")))
+            case .paragraph(let t): parts.append(MarkdownInline.plain(t))
             case .quote(let lines): parts.append(lines.map { "“\(MarkdownInline.plain($0))”" }.joined(separator: "\n"))
             case .code(_, let code): parts.append(code)
             case .list(let ordered, let items):

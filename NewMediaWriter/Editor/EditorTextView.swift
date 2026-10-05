@@ -4,6 +4,35 @@ import UniformTypeIdentifiers
 /// NSTextView that keeps a centred reading column, hides markdown syntax away from the cursor,
 /// renders images below their `![]()` line and stores pasted/dropped images in `assets/`.
 final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDelegate {
+    let emojiPopup = EmojiPopup()
+
+    var overlayTracking: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        installOverlayCursorTracking()
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        _ = updateCursorForOverlays(event)
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        if updateCursorForOverlays(event) { return }
+        super.cursorUpdate(with: event)
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if newWindow == nil { emojiPopup.hide() }
+        super.viewWillMove(toWindow: newWindow)
+    }
+
+    override func doCommand(by selector: Selector) {
+        if handleEmojiCommand(selector) { return }
+        super.doCommand(by: selector)
+    }
+
     let styler = MarkdownStyler()
     var documentURL: URL? {
         didSet { if documentURL != oldValue, textStorage?.length ?? 0 > 0 { restyleAndRelayout() } }
@@ -32,6 +61,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     }
 
     override func resignFirstResponder() -> Bool {
+        emojiPopup.hide()
         let ok = super.resignFirstResponder()
         if ok, revealsMarkersOnlyWhenFocused {
             let range = activeParagraph
@@ -128,12 +158,16 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         updateActiveParagraph(invalidate: true)
         if foldAfterVisibleCharacters != nil { needsDisplay = true }
         needsImageLayout = true
-        DispatchQueue.main.async { [weak self] in self?.layoutImages() }
+        // Deferred: the popup queries layout, which must not happen while the edit is still being processed.
+        DispatchQueue.main.async { [weak self] in self?.layoutImages(); self?.updateEmojiSuggestions() }
     }
 
     override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
         super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
         updateActiveParagraph(invalidate: true)
+        if emojiPopup.isVisible && !stillSelecting {
+            DispatchQueue.main.async { [weak self] in self?.updateEmojiSuggestions() }
+        }
     }
 
     private func updateActiveParagraph(invalidate: Bool) {
@@ -443,10 +477,15 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         return super.readSelection(from: pboard, type: type)
     }
 
+    // NSTextView.pasteAsPlainText silently did nothing here, so paste the string ourselves.
     override func paste(_ sender: Any?) {
         if insertImages(from: .general) { return }
-        pasteAsPlainText(sender)
+        if let s = NSPasteboard.general.string(forType: .string) {
+            insertText(s, replacementRange: selectedRange())
+        }
     }
+
+    override func pasteAsPlainText(_ sender: Any?) { paste(sender) }
 
     @discardableResult
     private func insertImages(from pboard: NSPasteboard) -> Bool {

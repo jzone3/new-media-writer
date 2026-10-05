@@ -28,34 +28,32 @@ struct SlackView: View {
     private var text: String { document.text }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            HStack(spacing: 0) {
-                sidebar.frame(width: 220)
-                VStack(spacing: 0) {
-                    channelHeader
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            Spacer(minLength: 24)
-                            ghostMessage(seed: 0)
-                            ghostMessage(seed: 1)
-                            dateDivider("Today")
-                            SlackMessage(markdown: text, baseURL: baseURL, profile: profile, onEdit: { document.text = $0 })
-                            ghostMessage(seed: 2).padding(.top, 16)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.bottom, 16)
+        HStack(spacing: 0) {
+            sidebar.frame(width: 220)
+            VStack(spacing: 0) {
+                channelHeader
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Spacer(minLength: 24)
+                        ghostMessage(seed: 0)
+                        ghostMessage(seed: 1)
+                        dateDivider("Today")
+                        SlackMessage(markdown: text, baseURL: baseURL, profile: profile, onEdit: { document.text = $0 })
+                        ghostMessage(seed: 2).padding(.top, 16)
                     }
-                    composer
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 60)
                 }
+                .overlay(alignment: .bottomTrailing) {
+                    HStack(spacing: 8) {
+                        CopyButton(payload: { Exporter.slack(text) },
+                                   alternatives: [(title: "Copy as plain mrkdwn only", payload: { Exporter.slackPlain(text) })])
+                        CharacterBadge(count: MarkdownRender.plainText(text).count, limit: SlackTheme.limit)
+                    }
+                    .padding(.horizontal, 20).padding(.bottom, 12)
+                }
+                composer
             }
-            .padding(.top, 0)
-
-            HStack(spacing: 8) {
-                CopyButton(payload: { Exporter.slack(text) },
-                           alternatives: [(title: "Copy as plain mrkdwn only", payload: { Exporter.slackPlain(text) })])
-                CharacterBadge(count: MarkdownRender.plainText(text).count, limit: SlackTheme.limit)
-            }
-            .padding(16).padding(.bottom, 64)
         }
     }
 

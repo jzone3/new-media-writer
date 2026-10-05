@@ -6,6 +6,7 @@ struct SettingsView: View {
     @AppStorage(ProfileKeys.headline) private var headline = "Builder · Writer"
     @AppStorage(ProfileKeys.avatarPath) private var avatarPath = ""
     @AppStorage(ProfileKeys.slackChannel) private var slackChannel = "general"
+    @State private var isDefaultApp = DefaultApp.isDefault
 
     var body: some View {
         Form {
@@ -29,10 +30,31 @@ struct SettingsView: View {
                 TextField("LinkedIn headline", text: $headline)
                 TextField("Slack channel", text: $slackChannel, prompt: Text("general"))
             }
+            Section("Markdown files") {
+                HStack {
+                    Text(markdownStatus)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Make Default") {
+                        DefaultApp.makeDefault { _ in isDefaultApp = DefaultApp.isDefault }
+                    }
+                    .disabled(isDefaultApp || DefaultApp.isRunningFromTemporaryLocation)
+                }
+            }
         }
         .formStyle(.grouped)
         .frame(width: 460)
         .padding(.bottom, 8)
+        .onAppear { isDefaultApp = DefaultApp.isDefault }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            isDefaultApp = DefaultApp.isDefault
+        }
+    }
+
+    private var markdownStatus: String {
+        if isDefaultApp { return "New Media Writer opens .md files by default." }
+        if DefaultApp.isRunningFromTemporaryLocation { return "Move New Media Writer to Applications first." }
+        return "Another app opens .md files."
     }
 
     private func chooseAvatar() {
