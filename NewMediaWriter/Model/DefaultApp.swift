@@ -7,7 +7,7 @@ enum DefaultApp {
 
     static var isDefault: Bool {
         guard let current = NSWorkspace.shared.urlForApplication(toOpen: markdown) else { return false }
-        return current.standardizedFileURL == Bundle.main.bundleURL.standardizedFileURL
+        return current.resolvingSymlinksInPath().path == Bundle.main.bundleURL.resolvingSymlinksInPath().path
     }
 
     static func makeDefault(completion: ((Error?) -> Void)? = nil) {

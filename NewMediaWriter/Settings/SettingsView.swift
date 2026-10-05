@@ -45,6 +45,10 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 460)
         .padding(.bottom, 8)
+        .onAppear { isDefaultApp = DefaultApp.isDefault }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            isDefaultApp = DefaultApp.isDefault
+        }
     }
 
     private func chooseAvatar() {
