@@ -443,10 +443,15 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         return super.readSelection(from: pboard, type: type)
     }
 
+    // NSTextView.pasteAsPlainText silently did nothing here, so paste the string ourselves.
     override func paste(_ sender: Any?) {
         if insertImages(from: .general) { return }
-        pasteAsPlainText(sender)
+        if let s = NSPasteboard.general.string(forType: .string) {
+            insertText(s, replacementRange: selectedRange())
+        }
     }
+
+    override func pasteAsPlainText(_ sender: Any?) { paste(sender) }
 
     @discardableResult
     private func insertImages(from pboard: NSPasteboard) -> Bool {
