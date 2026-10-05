@@ -34,11 +34,13 @@ struct AvatarView: View {
             if let image = profile.avatarImage {
                 Image(nsImage: image).resizable().scaledToFill()
             } else {
+                // Same look as the app icon: solid black with white initials (inverts in dark mode so it stays visible).
                 ZStack {
-                    LinearGradient(colors: [Color(hex: 0x6A5AE0), Color(hex: 0xE05A9A)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    Color.adaptive(light: 0x000000, dark: 0xFFFFFF)
                     Text(profile.initials)
-                        .font(.system(size: size * 0.38, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .font(.system(size: size * 0.4, weight: .semibold))
+                        .tracking(size * 0.01)
+                        .foregroundStyle(Color.adaptive(light: 0xFFFFFF, dark: 0x000000))
                 }
             }
         }
