@@ -92,9 +92,18 @@ struct XPostFeedView: View {
         guard index < thread.count else { return }
         let segment = thread[index]
         guard NSMaxRange(segment.range) <= ns.length else { return }
+        // Keep the blank lines that padded this post around its `---` separators.
+        let original = ns.substring(with: segment.range)
         var replacement = edited
-        if index > 0, !replacement.hasPrefix("\n") { replacement = "\n" + replacement }
-        if index < thread.count - 1, !replacement.hasSuffix("\n") { replacement += "\n" }
+        if index > 0 {
+            let lead = String(original.prefix { $0 == "\n" })
+            replacement = (lead.isEmpty ? "\n" : lead) + replacement.drop { $0 == "\n" }
+        }
+        if index < thread.count - 1 {
+            let trail = String(original.reversed().prefix { $0 == "\n" })
+            let body = String(replacement.reversed().drop { $0 == "\n" }.reversed())
+            replacement = body + (trail.isEmpty ? "\n" : trail)
+        }
         document.text = ns.replacingCharacters(in: segment.range, with: replacement)
     }
 
