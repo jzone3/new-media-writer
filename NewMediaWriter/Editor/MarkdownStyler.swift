@@ -82,7 +82,7 @@ final class MarkdownStyler {
     private static let inlineCode = try! NSRegularExpression(pattern: "`([^`\\n]+)`")
     private static let boldItalic = try! NSRegularExpression(pattern: "(\\*\\*\\*|___)(?=\\S)(.+?)(?<=\\S)\\1")
     private static let bold = try! NSRegularExpression(pattern: "(\\*\\*|__)(?=\\S)(.+?)(?<=\\S)\\1")
-    private static let italic = try! NSRegularExpression(pattern: "(?<![\\w*_])(\\*|_)(?=\\S)([^*_\\n]+?)(?<=\\S)\\1(?![\\w*_])")
+    private static let italic = try! NSRegularExpression(pattern: "(?<![\\w*_])(\\*|_)(?=\\S)([^*_\\n]+?)(?<=\\S)\\1(?!\\w)")
     private static let strike = try! NSRegularExpression(pattern: "~~(?=\\S)(.+?)(?<=\\S)~~")
     private static let link = try! NSRegularExpression(pattern: "(?<!!)\\[([^\\]\\n]+)\\]\\(([^)\\n]+)\\)")
     private static let inlineImage = MarkdownParser.imageRegex
