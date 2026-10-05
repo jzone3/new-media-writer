@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 
 final class ImageCache {
     static let shared = ImageCache()
@@ -54,16 +55,12 @@ enum ImagePathResolver {
     }
 }
 
-/// Copies pasted / dropped images next to the document and returns the markdown path.
+/// Copies pasted / dropped images into `assets/` beside the document and returns their markdown paths.
 struct ImageStore {
-    let documentURL: URL?
+    let documentURL: URL
 
     var assetsDirectory: URL {
-        if let documentURL {
-            return documentURL.deletingLastPathComponent().appendingPathComponent("assets", isDirectory: true)
-        }
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return support.appendingPathComponent("New Media Writer/Untitled Assets", isDirectory: true)
+        documentURL.deletingLastPathComponent().appendingPathComponent("assets", isDirectory: true)
     }
 
     func store(data: Data, preferredName: String, ext: String) throws -> String {
@@ -78,7 +75,7 @@ struct ImageStore {
         }
         let dest = dir.appendingPathComponent(name)
         try data.write(to: dest)
-        return markdownPath(for: dest)
+        return "assets/" + dest.lastPathComponent.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!
     }
 
     func store(fileURL: URL) throws -> String {
@@ -87,10 +84,65 @@ struct ImageStore {
         return try store(data: data, preferredName: base, ext: fileURL.pathExtension.lowercased())
     }
 
-    private func markdownPath(for dest: URL) -> String {
-        if documentURL != nil {
-            return "assets/" + dest.lastPathComponent.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!
+    // MARK: - Pasteboards
+
+    private static let imageFileOptions: [NSPasteboard.ReadingOptionKey: Any] = [
+        .urlReadingFileURLsOnly: true,
+        .urlReadingContentsConformToTypes: [UTType.image.identifier],
+    ]
+
+    /// True when the pasteboard carries image files or raw image data.
+    static func hasImages(on pboard: NSPasteboard) -> Bool {
+        pboard.canReadObject(forClasses: [NSURL.self], options: imageFileOptions)
+            || pboard.availableType(from: [.png, .tiff]) != nil
+    }
+
+    /// Saves every image on the pasteboard (files first, then raw data); nil when there is nothing to save.
+    func storeImages(from pboard: NSPasteboard) -> [String]? {
+        var paths: [String] = []
+        if let urls = pboard.readObjects(forClasses: [NSURL.self], options: Self.imageFileOptions) as? [URL], !urls.isEmpty {
+            for url in urls {
+                if let p = try? store(fileURL: url) { paths.append(p) }
+            }
+        } else if let data = pboard.data(forType: .png) {
+            if let p = try? store(data: data, preferredName: Self.timestampName(), ext: "png") { paths.append(p) }
+        } else if let data = pboard.data(forType: .tiff), let rep = NSBitmapImageRep(data: data),
+                  let png = rep.representation(using: .png, properties: [:]) {
+            if let p = try? store(data: png, preferredName: Self.timestampName(), ext: "png") { paths.append(p) }
         }
-        return dest.path
+        return paths.isEmpty ? nil : paths
+    }
+
+    /// One `![alt](path)` line per image, alt text taken from the file name.
+    static func markdown(for paths: [String]) -> String {
+        paths.map { path in
+            let name = (path as NSString).lastPathComponent
+            let alt = ((name.removingPercentEncoding ?? name) as NSString).deletingPathExtension
+            return "![\(alt)](\(path))"
+        }.joined(separator: "\n")
+    }
+
+    private static func timestampName() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd-HHmmss"
+        return "image-" + f.string(from: Date())
+    }
+
+    /// Untitled documents have nowhere to keep assets, so ask to save instead of stashing images elsewhere.
+    static func promptToSave(in window: NSWindow?) {
+        let alert = NSAlert()
+        alert.messageText = "Save this document first so images can be stored next to it"
+        alert.informativeText = "Images are copied into an assets folder beside the Markdown file."
+        alert.addButton(withTitle: "Save…")
+        alert.addButton(withTitle: "Cancel")
+        let handle: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .alertFirstButtonReturn else { return }
+            // Let the alert sheet finish closing before the save panel takes its place.
+            DispatchQueue.main.async {
+                let document = window.flatMap { NSDocumentController.shared.document(for: $0) } ?? NSDocumentController.shared.currentDocument
+                document?.save(nil)
+            }
+        }
+        if let window { alert.beginSheetModal(for: window, completionHandler: handle) } else { handle(alert.runModal()) }
     }
 }

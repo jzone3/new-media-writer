@@ -7,6 +7,7 @@ struct PostEditor: NSViewRepresentable {
     var theme: EditorTheme
     var documentURL: URL?
     var foldAfter: Int? = nil
+    var foldStyle = FoldMarkerStyle()
     var takesFocusOnAppear = false
     var onChange: (String) -> Void
     @Environment(\.undoManager) private var undoManager
@@ -23,6 +24,7 @@ struct PostEditor: NSViewRepresentable {
         let textView = EditorTextView(frame: .zero, textContainer: container)
         textView.fillsWidth = true
         textView.showsImages = false
+        textView.acceptsImageDrops = false
         textView.revealsMarkersOnlyWhenFocused = true
         textView.topInset = 0
         textView.usesFindBar = false
@@ -32,6 +34,7 @@ struct PostEditor: NSViewRepresentable {
         textView.documentURL = documentURL
         textView.styler.theme = theme
         textView.foldAfterVisibleCharacters = foldAfter
+        textView.foldStyle = foldStyle
         textView.takesFocusOnAppear = takesFocusOnAppear
         textView.string = text
         textView.restyleAndRelayout()
@@ -43,6 +46,7 @@ struct PostEditor: NSViewRepresentable {
         context.coordinator.parent = self
         textView.documentURL = documentURL
         textView.foldAfterVisibleCharacters = foldAfter
+        textView.foldStyle = foldStyle
         let current = textView.string
         guard current != text else { return }
         // While the user is typing, SwiftUI can call this with a value one keystroke behind the text
