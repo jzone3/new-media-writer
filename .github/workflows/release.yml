@@ -52,10 +52,10 @@ jobs:
             PUBLISH=true
           elif [[ "$GITHUB_REF" == refs/heads/master ]]; then
             # Next patch after the highest existing vX.Y.Z tag; the tag itself is created at publish time.
-            LATEST="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sed 's/^v//' | grep -E "$SEMVER" | sort -V | tail -1)"
+            LATEST="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sed 's/^v//' | { grep -E "$SEMVER" || true; } | sort -V | tail -1)"
             LATEST="${LATEST:-0.0.0}"
             IFS=. read -r MAJOR MINOR PATCH <<< "$LATEST"
-            VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+            VERSION="$((10#$MAJOR)).$((10#$MINOR)).$((10#$PATCH + 1))"
             PUBLISH=true
           else
             VERSION="0.0.$GITHUB_RUN_NUMBER"
@@ -142,6 +142,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.marketing }}
+          target_commitish: ${{ github.sha }}   # tag the commit that was built, even if master moved on
           files: |
             ${{ env.dmg }}
             New-Media-Writer.dmg
