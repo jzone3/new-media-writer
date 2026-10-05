@@ -18,6 +18,7 @@ final class EmojiPopup {
     }()
     private lazy var host = NSHostingView(rootView: list)
     private var clickMonitor: Any?
+    private var wheelObserver: Any?
 
     var isVisible: Bool { panel.isVisible }
 
@@ -46,10 +47,16 @@ final class EmojiPopup {
                 return event
             }
         }
+        if wheelObserver == nil {
+            wheelObserver = NotificationCenter.default.addObserver(forName: ScrollPassthrough.didForwardWheel, object: nil, queue: .main) { [weak self] _ in
+                self?.hide()
+            }
+        }
     }
 
     func hide() {
         if let clickMonitor { NSEvent.removeMonitor(clickMonitor); self.clickMonitor = nil }
+        if let wheelObserver { NotificationCenter.default.removeObserver(wheelObserver); self.wheelObserver = nil }
         guard panel.isVisible || panel.parent != nil else { return }
         panel.parent?.removeChildWindow(panel)
         panel.orderOut(nil)

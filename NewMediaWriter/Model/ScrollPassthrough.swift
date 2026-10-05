@@ -3,6 +3,8 @@ import AppKit
 /// Wheel events that land on overlays (the view switcher, Copy / counter pills) would otherwise be
 /// swallowed by the hosting view; forward them to the scroll view underneath so scrolling works anywhere.
 enum ScrollPassthrough {
+    /// Posted for every wheel event this monitor consumes, since later local monitors never see it.
+    static let didForwardWheel = Notification.Name("ScrollPassthrough.didForwardWheel")
     private static var monitor: Any?
 
     static func install() {
@@ -17,10 +19,12 @@ enum ScrollPassthrough {
                 // or to overlay chrome (Copy pill, header), so drive it directly instead.
                 if type(of: scroll) == NSScrollView.self { return event }
                 scroll.scrollWheel(with: event)
+                NotificationCenter.default.post(name: didForwardWheel, object: event.window)
                 return nil
             }
             guard let scroll = deepestScrollView(in: content, containing: point) ?? anyScrollView(in: content) else { return event }
             scroll.scrollWheel(with: event)
+            NotificationCenter.default.post(name: didForwardWheel, object: event.window)
             return nil
         }
     }
