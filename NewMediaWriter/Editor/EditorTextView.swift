@@ -267,26 +267,38 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         drawFoldMarker()
     }
 
-    private func drawFoldMarker() {
-        guard let fold = foldAfterVisibleCharacters, fold > 0,
-              let layoutManager, let textContainer, let textStorage, textStorage.length > 0 else { return }
+    private static let foldLabel = "…more  ·  fold" as NSString
+    private var foldLabelAttributes: [NSAttributedString.Key: Any] {
+        [.font: NSFont.systemFont(ofSize: 10, weight: .semibold), .foregroundColor: styler.theme.secondary]
+    }
+
+    /// Character index where the fold falls, if the text runs past `foldAfterVisibleCharacters`.
+    private func foldCharacterIndex() -> Int? {
+        guard let fold = foldAfterVisibleCharacters, fold > 0, let textStorage, textStorage.length > 0 else { return nil }
         var visible = 0
-        var foldIndex: Int?
         var i = 0
         while i < textStorage.length {
             var effective = NSRange()
             let isMarker = textStorage.attribute(.mdMarker, at: i, effectiveRange: &effective) != nil
             if !isMarker {
-                if visible + effective.length > fold {
-                    foldIndex = i + (fold - visible)
-                    break
-                }
+                if visible + effective.length > fold { return i + (fold - visible) }
                 visible += effective.length
             }
             i = effective.location + effective.length
         }
-        guard let foldIndex, foldIndex < textStorage.length else { return }
+        return nil
+    }
 
+    /// Bottom edge of the fold label in text-container coordinates, so hosts sizing to content can reserve room for it.
+    var foldMarkerBottom: CGFloat? {
+        guard let layoutManager, let foldIndex = foldCharacterIndex() else { return nil }
+        let glyph = layoutManager.glyphIndexForCharacter(at: foldIndex)
+        let line = layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
+        return line.maxY + 4 + Self.foldLabel.size(withAttributes: foldLabelAttributes).height
+    }
+
+    private func drawFoldMarker() {
+        guard let layoutManager, let textContainer, let foldIndex = foldCharacterIndex() else { return }
         let glyph = layoutManager.glyphIndexForCharacter(at: foldIndex)
         var line = layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
         let origin = textContainerOrigin
@@ -303,13 +315,9 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         styler.theme.secondary.withAlphaComponent(0.7).setStroke()
         path.stroke()
 
-        let label = "…more  ·  fold" as NSString
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 10, weight: .semibold),
-            .foregroundColor: styler.theme.secondary,
-        ]
-        let size = label.size(withAttributes: attrs)
-        label.draw(at: NSPoint(x: origin.x + width - size.width, y: y + 2), withAttributes: attrs)
+        let attrs = foldLabelAttributes
+        let size = Self.foldLabel.size(withAttributes: attrs)
+        Self.foldLabel.draw(at: NSPoint(x: origin.x + width - size.width, y: y + 2), withAttributes: attrs)
     }
 
     // MARK: - Images
