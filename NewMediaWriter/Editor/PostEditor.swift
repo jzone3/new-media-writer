@@ -43,15 +43,20 @@ struct PostEditor: NSViewRepresentable {
         context.coordinator.parent = self
         textView.documentURL = documentURL
         textView.foldAfterVisibleCharacters = foldAfter
-        // Thread segments arrive trimmed; don't yank a trailing newline the user just typed.
         let current = textView.string
-        if current != text,
-           current.trimmingCharacters(in: .whitespacesAndNewlines) != text.trimmingCharacters(in: .whitespacesAndNewlines) {
-            let sel = textView.selectedRange()
-            textView.string = text
-            textView.setSelectedRange(NSRange(location: min(sel.location, (text as NSString).length), length: 0))
-            textView.restyleAndRelayout()
+        guard current != text else {
+            context.coordinator.sentTexts.removeAll()
+            return
         }
+        // SwiftUI can call this with a value one keystroke behind the text view (a newline grows the
+        // card, which triggers an extra layout pass). Echoes of our own edits must never overwrite
+        // what the user has typed since; thread segments also arrive trimmed, so compare loosely.
+        if context.coordinator.isEcho(text) { return }
+        context.coordinator.sentTexts.removeAll()
+        let sel = textView.selectedRange()
+        textView.string = text
+        textView.setSelectedRange(NSRange(location: min(sel.location, (text as NSString).length), length: 0))
+        textView.restyleAndRelayout()
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView textView: EditorTextView, context: Context) -> CGSize? {
@@ -73,9 +78,19 @@ struct PostEditor: NSViewRepresentable {
 
         init(_ parent: PostEditor) { self.parent = parent }
 
+        /// Recent strings reported through `onChange`, so stale re-renders of them are recognised.
+        var sentTexts: [String] = []
+
         func textDidChange(_ notification: Notification) {
             guard let textView else { return }
+            sentTexts.append(textView.string)
+            if sentTexts.count > 16 { sentTexts.removeFirst(sentTexts.count - 16) }
             parent.onChange(textView.string)
+        }
+
+        func isEcho(_ text: String) -> Bool {
+            let incoming = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return sentTexts.contains { $0.trimmingCharacters(in: .whitespacesAndNewlines) == incoming }
         }
 
         func undoManager(for view: NSTextView) -> UndoManager? { parent.undoManager }
