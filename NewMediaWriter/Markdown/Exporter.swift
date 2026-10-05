@@ -78,7 +78,7 @@ enum Exporter {
             case .heading(_, let t):
                 parts.append("*\(MarkdownInline.plain(t))*")
             case .paragraph(let t):
-                parts.append(inlineMrkdwn(t.replacingOccurrences(of: "\n", with: " ")))
+                parts.append(inlineMrkdwn(t))
             case .quote(let lines):
                 parts.append(lines.map { "> " + inlineMrkdwn($0) }.joined(separator: "\n"))
             case .code(_, let code):
