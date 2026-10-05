@@ -10,6 +10,7 @@ extension EditorTextView {
         let sel = selectedRange()
         let ns = string as NSString
         let selected = ns.substring(with: sel)
+        guard selected.rangeOfCharacter(from: .newlines) == nil else { NSSound.beep(); return }
         let clip = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let url = clip.hasPrefix("http://") || clip.hasPrefix("https://") ? clip : ""
         let text = "[\(selected)](\(url))"
@@ -48,14 +49,22 @@ extension EditorTextView {
         let selected = ns.substring(with: sel)
         if selected.count >= 2 * m, selected.hasPrefix(marker), selected.hasSuffix(marker) {
             let inner = String(selected.dropFirst(m).dropLast(m))
-            replace(sel, with: inner, select: NSRange(location: sel.location, length: (inner as NSString).length))
-            return
+            // `**one** and **two**` is two spans, not one wrapped selection.
+            if !inner.contains(marker) {
+                replace(sel, with: inner, select: NSRange(location: sel.location, length: (inner as NSString).length))
+                return
+            }
         }
 
+        // Unwrap only when the run of marker characters hugging the selection is exactly `marker`,
+        // so ⌘I on the word inside `**word**` adds italics instead of eating the bold markers.
         let outer = NSRange(location: sel.location - m, length: sel.length + 2 * m)
+        let markerChar = marker.first!
         if outer.location >= 0, NSMaxRange(outer) <= ns.length,
            ns.substring(with: NSRange(location: outer.location, length: m)) == marker,
-           ns.substring(with: NSRange(location: NSMaxRange(sel), length: m)) == marker {
+           ns.substring(with: NSRange(location: NSMaxRange(sel), length: m)) == marker,
+           outer.location == 0 || Character(UnicodeScalar(ns.character(at: outer.location - 1))!) != markerChar,
+           NSMaxRange(outer) == ns.length || Character(UnicodeScalar(ns.character(at: NSMaxRange(outer)))!) != markerChar {
             replace(outer, with: selected, select: NSRange(location: outer.location, length: sel.length))
             return
         }

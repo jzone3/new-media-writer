@@ -5,7 +5,7 @@ Usage: scripts/make-appicon.py source.png
 Applies the macOS Big Sur squircle (artwork on 824/1024 of the canvas, transparent margin).
 """
 import json, os, sys
-from PIL import Image, ImageDraw
+from PIL import Image, ImageChops, ImageDraw
 
 SRC = sys.argv[1]
 OUT = os.path.join(os.path.dirname(__file__), "..", "NewMediaWriter", "Resources", "Assets.xcassets", "AppIcon.appiconset")
@@ -21,7 +21,7 @@ def squircle(size, radius, supersample=4):
 
 
 art = Image.open(SRC).convert("RGBA").resize((ART, ART), Image.LANCZOS)
-art.putalpha(squircle(ART, RADIUS))
+art.putalpha(ImageChops.multiply(art.getchannel("A"), squircle(ART, RADIUS)))
 master = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
 master.paste(art, ((CANVAS - ART) // 2, (CANVAS - ART) // 2), art)
 
