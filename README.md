@@ -24,6 +24,26 @@ open "build/Build/Products/Debug/New Media Writer.app"
 
 Or open `NewMediaWriter.xcodeproj` in Xcode and run.
 
+## Releasing
+
+Pushing a tag like `v0.2.0` runs `.github/workflows/release.yml`, which builds a Release archive signed with a
+Developer ID certificate (hardened runtime), notarizes it, wraps it in a DMG, notarizes and staples the DMG and
+attaches it to a GitHub Release. The tag (minus `v`) becomes the app version.
+
+Repository secrets it expects:
+
+| Secret | Value |
+| --- | --- |
+| `MAC_CERT_P12` | base64 of a "Developer ID Application" certificate exported as `.p12` (`base64 -i cert.p12`) |
+| `MAC_CERT_PASSWORD` | password used when exporting the `.p12` |
+| `APPLE_TEAM_ID` | 10-character team ID from developer.apple.com → Membership |
+| `NOTARY_KEY_P8` | base64 of an App Store Connect API key (`.p8`, Team Key, role Developer) |
+| `NOTARY_KEY_ID` | the key's ID |
+| `NOTARY_ISSUER_ID` | the issuer ID shown on the Integrations → Team Keys page |
+
+Local builds keep ad-hoc signing (`CODE_SIGN_IDENTITY: "-"` in `project.yml`); nothing here changes how you run
+from Xcode.
+
 ## Shortcuts
 
 | Action | Keys |
