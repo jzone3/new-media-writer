@@ -227,8 +227,10 @@ final class MarkdownStyler {
             return
         }
 
-        if let item = MarkdownParser.listItem(trimmed) {
-            let prefixLen = trimmed.count - item.content.count
+        // Left-trim only, so an empty item (`- ` with nothing after it) still counts as a list line.
+        let leftTrimmed = String(line.dropFirst(leading)).trimmingCharacters(in: .newlines)
+        if let item = MarkdownParser.listItem(leftTrimmed) {
+            let prefixLen = leftTrimmed.count - item.content.count
             let markerRange = NSRange(location: range.location + leading, length: min(prefixLen, range.length - leading))
             storage.addAttribute(.foregroundColor, value: item.ordered ? theme.accent : theme.text, range: markerRange)
             if !item.ordered, !raw, markerRange.length > 0 {

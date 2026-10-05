@@ -127,15 +127,17 @@ extension EditorTextView {
             }
         }
 
-        // Unwrap only when the run of marker characters hugging the selection is exactly `marker`,
-        // so ⌘I on the word inside `**word**` adds italics instead of eating the bold markers.
-        let outer = NSRange(location: sel.location - m, length: sel.length + 2 * m)
-        let markerChar = marker.first!
-        if outer.location >= 0, NSMaxRange(outer) <= ns.length,
-           ns.substring(with: NSRange(location: outer.location, length: m)) == marker,
-           ns.substring(with: NSRange(location: NSMaxRange(sel), length: m)) == marker,
-           outer.location == 0 || Character(UnicodeScalar(ns.character(at: outer.location - 1))!) != markerChar,
-           NSMaxRange(outer) == ns.length || Character(UnicodeScalar(ns.character(at: NSMaxRange(outer)))!) != markerChar {
+        // Unwrap when the run of marker characters hugging the selection means the style is on:
+        // for `*` an odd run (1 = italic, 3 = bold+italic), for `**` a run of 2 or 3, for backticks exactly 1.
+        let markerChar = marker.utf16.first!
+        var left = 0
+        while sel.location - left - 1 >= 0, ns.character(at: sel.location - left - 1) == markerChar { left += 1 }
+        var right = 0
+        while NSMaxRange(sel) + right < ns.length, ns.character(at: NSMaxRange(sel) + right) == markerChar { right += 1 }
+        let run = min(left, right)
+        let styleIsOn = m == 1 ? (marker == "*" ? run % 2 == 1 && run <= 3 : run == 1) : run == 2 || run == 3
+        if styleIsOn {
+            let outer = NSRange(location: sel.location - m, length: sel.length + 2 * m)
             replace(outer, with: selected, select: NSRange(location: outer.location, length: sel.length))
             return
         }
