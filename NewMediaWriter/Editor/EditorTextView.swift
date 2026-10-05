@@ -6,6 +6,11 @@ import UniformTypeIdentifiers
 final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDelegate {
     let emojiPopup = EmojiPopup()
 
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if newWindow == nil { emojiPopup.hide() }
+        super.viewWillMove(toWindow: newWindow)
+    }
+
     override func doCommand(by selector: Selector) {
         if handleEmojiCommand(selector) { return }
         super.doCommand(by: selector)
