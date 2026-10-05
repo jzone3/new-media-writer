@@ -170,9 +170,9 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
 
     private func install(_ release: Release) {
         guard canInstallInPlace else {
-            NSWorkspace.shared.open(release.downloadURL)
-            present(alert("Downloading New Media Writer \(release.version) in your browser",
-                          "This copy can't update itself from \(bundleURL.deletingLastPathComponent().path). Open the downloaded disk image and drag New Media Writer to your Applications folder."))
+            let alert = alert("New Media Writer \(release.version) will download in your browser",
+                              "This copy can't update itself from \(bundleURL.deletingLastPathComponent().path). Open the downloaded disk image and drag New Media Writer to your Applications folder.")
+            present(alert) { _ in NSWorkspace.shared.open(release.downloadURL) }
             return
         }
         pendingRelease = release
@@ -362,11 +362,14 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
         return alert
     }
 
+    /// Deferred a turn so an alert chosen from another sheet's completion handler lands after that sheet has gone.
     private func present(_ alert: NSAlert, completion: ((NSApplication.ModalResponse) -> Void)? = nil) {
-        if let window = NSApp.keyWindow, window.sheets.isEmpty, window.attachedSheet == nil {
-            alert.beginSheetModal(for: window) { completion?($0) }
-        } else {
-            completion?(alert.runModal())
+        DispatchQueue.main.async {
+            if let window = NSApp.keyWindow, window.attachedSheet == nil {
+                alert.beginSheetModal(for: window) { completion?($0) }
+            } else {
+                completion?(alert.runModal())
+            }
         }
     }
 }
