@@ -34,13 +34,15 @@ struct AvatarView: View {
             if let image = profile.avatarImage {
                 Image(nsImage: image).resizable().scaledToFill()
             } else {
-                // Same look as the app icon: solid black with white initials (inverts in dark mode so it stays visible).
+                // Generic Apple Contacts placeholder: grey gradient disc, white rounded initials.
                 ZStack {
-                    Color.adaptive(light: 0x000000, dark: 0xFFFFFF)
+                    LinearGradient(
+                        colors: [Color(hex: 0xB4B9C3), Color(hex: 0x8C919B)],
+                        startPoint: .top, endPoint: .bottom
+                    )
                     Text(profile.initials)
-                        .font(.system(size: size * 0.4, weight: .semibold))
-                        .tracking(size * 0.01)
-                        .foregroundStyle(Color.adaptive(light: 0xFFFFFF, dark: 0x000000))
+                        .font(.system(size: size * 0.42, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white)
                 }
             }
         }

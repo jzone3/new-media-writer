@@ -12,9 +12,14 @@ extension ViewMode {
         }
     }
 
-    func matches(_ query: String) -> Bool {
+    /// Lower is better; nil means no match. Exact alias ("x") beats a prefix ("sl") beats a substring inside the title.
+    func matchRank(_ query: String) -> Int? {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
-        return q.isEmpty || searchTerms.contains { $0.hasPrefix(q) } || title.lowercased().contains(q)
+        if q.isEmpty { return 0 }
+        if searchTerms.contains(q) { return 1 }
+        if searchTerms.contains(where: { $0.hasPrefix(q) }) { return 2 }
+        if title.lowercased().contains(q) { return 3 }
+        return nil
     }
 }
 
@@ -37,7 +42,12 @@ struct ViewPicker: View {
     @State private var selection = 0
     @FocusState private var focused: Bool
 
-    private var results: [ViewMode] { ViewMode.allCases.filter { $0.matches(query) } }
+    private var results: [ViewMode] {
+        ViewMode.allCases
+            .compactMap { m in m.matchRank(query).map { (m, $0) } }
+            .sorted { $0.1 < $1.1 }
+            .map(\.0)
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
