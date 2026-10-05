@@ -38,7 +38,7 @@ The feed doesn't reward *clever*. It rewards clear.`;
     buttons.forEach(b => {
       const on = b.dataset.view === name;
       b.classList.toggle('on', on);
-      b.setAttribute('aria-selected', on);
+      b.setAttribute('aria-pressed', on);
     });
     const c = COUNTS[name];
     count.classList.toggle('on', !!c);
@@ -118,14 +118,14 @@ The feed doesn't reward *clever*. It rewards clear.`;
     caret.style.display = 'none';
     show('markdown');
   } else {
-    // Start when the window scrolls into view.
+    // Start as soon as any part of the window is on screen.
     const io = new IntersectionObserver(es => {
       if (es.some(e => e.isIntersecting)) { io.disconnect(); play(); }
-    }, { threshold: 0.35 });
+    }, { threshold: 0 });
     io.observe(win);
   }
 
-  // Latest release: version + size under the button, and a fallback if no release exists yet.
+  // Links start at the releases page (always valid); upgrade to the direct DMG once the latest release is known.
   fetch('https://api.github.com/repos/jzone3/new-media-writer/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
     .then(r => r.ok ? r.json() : Promise.reject(r.status))
     .then(rel => {
@@ -135,9 +135,7 @@ The feed doesn't reward *clever*. It rewards clear.`;
       document.querySelectorAll('[data-download]').forEach(a => a.href = dmg.browser_download_url);
       const mb = (dmg.size / 1048576).toFixed(1);
       const meta = document.querySelector('[data-release-meta]');
-      if (meta) meta.textContent = `${rel.tag_name} · ${mb} MB · macOS 14+ · Signed & notarized`;
+      if (meta) meta.textContent = `${rel.tag_name} · ${mb} MB · macOS 14+ · Signed & notarized · Free`;
     })
-    .catch(status => {
-      if (status === 404) document.querySelectorAll('[data-download]').forEach(a => a.href = 'https://github.com/jzone3/new-media-writer/releases');
-    });
+    .catch(() => {});
 })();
