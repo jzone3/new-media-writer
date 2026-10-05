@@ -33,11 +33,11 @@ struct ContentView: View {
         case .markdown, .plaintext:
             MarkdownEditor(document: document, fileURL: fileURL, raw: mode == .plaintext)
         case .xPost:
-            ProfileReader { profile in XPostFeedView(text: document.text, baseURL: fileURL, profile: profile) }
+            ProfileReader { profile in XPostFeedView(document: document, baseURL: fileURL, profile: profile) }
         case .linkedin:
-            ProfileReader { profile in LinkedInFeedView(text: document.text, baseURL: fileURL, profile: profile) }
+            ProfileReader { profile in LinkedInFeedView(document: document, baseURL: fileURL, profile: profile) }
         case .slack:
-            ProfileReader { profile in SlackView(text: document.text, baseURL: fileURL, profile: profile) }
+            ProfileReader { profile in SlackView(document: document, baseURL: fileURL, profile: profile) }
         }
     }
 

@@ -9,12 +9,23 @@ enum SlackTheme {
     static let codePink = Color(hex: 0xE01E5A)
     static let codeBackground = Color.adaptive(light: 0xF8F8F8, dark: 0x222529)
     static let limit = 40_000
+
+    static let editorTheme = EditorTheme.post(
+        size: 15,
+        text: .adaptive(light: 0x1D1C1D, dark: 0xD1D2D3),
+        secondary: .adaptive(light: 0x616061, dark: 0xABABAD),
+        accent: NSColor(Color(hex: 0x1264A3)),
+        codeBackground: .adaptive(light: 0xF8F8F8, dark: 0x222529),
+        lineHeightMultiple: 1.45
+    )
 }
 
 struct SlackView: View {
-    let text: String
+    @ObservedObject var document: MarkdownDocument
     let baseURL: URL?
     let profile: Profile
+
+    private var text: String { document.text }
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -28,7 +39,7 @@ struct SlackView: View {
                             ghostMessage(seed: 0)
                             ghostMessage(seed: 1)
                             dateDivider("Today")
-                            SlackMessage(markdown: text, baseURL: baseURL, profile: profile)
+                            SlackMessage(markdown: text, baseURL: baseURL, profile: profile, onEdit: { document.text = $0 })
                             ghostMessage(seed: 2).padding(.top, 16)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -166,9 +177,9 @@ struct SlackMessage: View {
     let markdown: String
     let baseURL: URL?
     let profile: Profile
+    var onEdit: (String) -> Void = { _ in }
 
     var body: some View {
-        let blocks = MarkdownParser.parse(markdown).filter { if case .image = $0 { return false }; return true }
         let images = MarkdownParser.images(in: markdown).map { ImagePathResolver.resolve($0.path, relativeTo: baseURL) }
 
         HStack(alignment: .top, spacing: 10) {
@@ -178,12 +189,13 @@ struct SlackMessage: View {
                     Text(profile.name).font(.system(size: 15, weight: .black)).foregroundStyle(SlackTheme.text)
                     Text(Date(), style: .time).font(.system(size: 12)).foregroundStyle(SlackTheme.secondary)
                 }
-                if blocks.isEmpty && images.isEmpty {
-                    Text("Message #\(profile.slackChannel)").font(.system(size: 15)).foregroundStyle(SlackTheme.secondary)
-                } else {
-                    BlockStack(blocks: blocks, baseURL: baseURL, style: Self.style)
-                        .textSelection(.enabled)
-                }
+                PostEditor(text: markdown, theme: SlackTheme.editorTheme, documentURL: baseURL, onChange: onEdit)
+                    .overlay(alignment: .topLeading) {
+                        if markdown.isEmpty {
+                            Text("Message #\(profile.slackChannel)").font(.system(size: 15)).foregroundStyle(SlackTheme.secondary)
+                                .allowsHitTesting(false)
+                        }
+                    }
                 if !images.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(Array(images.enumerated()), id: \.offset) { _, url in

@@ -12,6 +12,33 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     var maxColumnWidth: CGFloat = 720
     var topInset: CGFloat = 56
+    /// Embedded in a feed card: no centred column, text spans the full frame width.
+    var fillsWidth = false
+    /// Feed cards show media in their own grid, so the editor skips inline image rendering.
+    var showsImages = true
+    /// Draws a dashed "…more" fold line after this many visible (non-marker) characters.
+    var foldAfterVisibleCharacters: Int? { didSet { needsDisplay = true } }
+    /// Embedded editors only reveal syntax in the cursor's paragraph while they have keyboard focus.
+    var revealsMarkersOnlyWhenFocused = false
+
+    private var revealsActiveParagraph: Bool {
+        !revealsMarkersOnlyWhenFocused || window?.firstResponder === self
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        let ok = super.becomeFirstResponder()
+        if ok, revealsMarkersOnlyWhenFocused { invalidateGlyphs(in: activeParagraph) }
+        return ok
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let ok = super.resignFirstResponder()
+        if ok, revealsMarkersOnlyWhenFocused {
+            let range = activeParagraph
+            DispatchQueue.main.async { [weak self] in self?.invalidateGlyphs(in: range); self?.needsDisplay = true }
+        }
+        return ok
+    }
     var hideMarkers = true { didSet { invalidateAllGlyphs() } }
 
     private var activeParagraph = NSRange(location: 0, length: 0)
@@ -70,8 +97,8 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     }
 
     private func updateColumn(width: CGFloat) {
-        let column = min(max(width - 96, 240), maxColumnWidth)
-        let inset = max((width - column) / 2, 0)
+        let column = fillsWidth ? max(width, 10) : min(max(width - 96, 240), maxColumnWidth)
+        let inset = fillsWidth ? 0 : max((width - column) / 2, 0)
         textContainerInset = NSSize(width: inset, height: topInset)
         textContainer?.containerSize = NSSize(width: column, height: CGFloat.greatestFiniteMagnitude)
         if abs(column - lastColumnWidth) > 0.5 {
@@ -92,14 +119,14 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     // MARK: - Styling pipeline
 
-    func textStorage(_ textStorage: NSTextStorage, willProcessEditing editedMask: NSTextStorageEditActions, range editedRange: NSRange, changeInLength delta: Int) {
-        guard editedMask.contains(.editedCharacters) else { return }
-        styler.restyle(textStorage)
-    }
-
+    // Restyling happens here, after the edit has been processed, as an attribute-only pass. Doing it inside
+    // `willProcessEditing` widened the character-edit range to the whole document, which made NSTextView
+    // move the insertion point to the end of the text after every keystroke.
     override func didChangeText() {
         super.didChangeText()
+        if let textStorage { styler.restyle(textStorage) }
         updateActiveParagraph(invalidate: true)
+        if foldAfterVisibleCharacters != nil { needsDisplay = true }
         needsImageLayout = true
         DispatchQueue.main.async { [weak self] in self?.layoutImages() }
     }
@@ -150,7 +177,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         for i in 0..<glyphRange.length {
             let charIndex = charIndexes[i]
             guard charIndex < storage.length else { continue }
-            if NSLocationInRange(charIndex, activeParagraph) { continue }
+            if revealsActiveParagraph, NSLocationInRange(charIndex, activeParagraph) { continue }
             if storage.attribute(.mdMarker, at: charIndex, effectiveRange: nil) != nil {
                 newProps[i] = storage.attribute(.mdKeepLine, at: charIndex, effectiveRange: nil) != nil ? .controlCharacter : .null
                 changed = true
@@ -166,7 +193,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     func layoutManager(_ layoutManager: NSLayoutManager, shouldUse action: NSLayoutManager.ControlCharacterAction, forControlCharacterAt charIndex: Int) -> NSLayoutManager.ControlCharacterAction {
         if let storage = layoutManager.textStorage, charIndex < storage.length,
            storage.attribute(.mdKeepLine, at: charIndex, effectiveRange: nil) != nil,
-           !NSLocationInRange(charIndex, activeParagraph) {
+           !(revealsActiveParagraph && NSLocationInRange(charIndex, activeParagraph)) {
             return .whitespace
         }
         return action
@@ -200,7 +227,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         }
 
         textStorage.enumerateAttribute(.mdRule, in: full) { value, range, _ in
-            guard value != nil, !NSLocationInRange(range.location, activeParagraph) else { return }
+            guard value != nil, !(revealsActiveParagraph && NSLocationInRange(range.location, activeParagraph)) else { return }
             let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
             var r = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
             r.origin.y += origin.y
@@ -233,12 +260,72 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         }
     }
 
+    // MARK: - Fold marker (LinkedIn "…more")
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        drawFoldMarker()
+    }
+
+    private static let foldLabel = "…more  ·  fold" as NSString
+    private var foldLabelAttributes: [NSAttributedString.Key: Any] {
+        [.font: NSFont.systemFont(ofSize: 10, weight: .semibold), .foregroundColor: styler.theme.secondary]
+    }
+
+    /// Character index where the fold falls, if the text runs past `foldAfterVisibleCharacters`.
+    private func foldCharacterIndex() -> Int? {
+        guard let fold = foldAfterVisibleCharacters, fold > 0, let textStorage, textStorage.length > 0 else { return nil }
+        var visible = 0
+        var i = 0
+        while i < textStorage.length {
+            var effective = NSRange()
+            let isMarker = textStorage.attribute(.mdMarker, at: i, effectiveRange: &effective) != nil
+            if !isMarker {
+                if visible + effective.length > fold { return i + (fold - visible) }
+                visible += effective.length
+            }
+            i = effective.location + effective.length
+        }
+        return nil
+    }
+
+    /// Bottom edge of the fold label in text-container coordinates, so hosts sizing to content can reserve room for it.
+    var foldMarkerBottom: CGFloat? {
+        guard let layoutManager, let foldIndex = foldCharacterIndex() else { return nil }
+        let glyph = layoutManager.glyphIndexForCharacter(at: foldIndex)
+        let line = layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
+        return line.maxY + 4 + Self.foldLabel.size(withAttributes: foldLabelAttributes).height
+    }
+
+    private func drawFoldMarker() {
+        guard let layoutManager, let textContainer, let foldIndex = foldCharacterIndex() else { return }
+        let glyph = layoutManager.glyphIndexForCharacter(at: foldIndex)
+        var line = layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
+        let origin = textContainerOrigin
+        line.origin.x += origin.x
+        line.origin.y += origin.y
+        let y = line.maxY + 2
+        let width = textContainer.containerSize.width
+
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: origin.x, y: y))
+        path.line(to: NSPoint(x: origin.x + width, y: y))
+        path.lineWidth = 1
+        path.setLineDash([4, 4], count: 2, phase: 0)
+        styler.theme.secondary.withAlphaComponent(0.7).setStroke()
+        path.stroke()
+
+        let attrs = foldLabelAttributes
+        let size = Self.foldLabel.size(withAttributes: attrs)
+        Self.foldLabel.draw(at: NSPoint(x: origin.x + width - size.width, y: y + 2), withAttributes: attrs)
+    }
+
     // MARK: - Images
 
     private var needsImageLayout = false
 
     func displayHeight(forImagePath path: String) -> CGFloat {
-        guard let url = ImagePathResolver.resolve(path, relativeTo: documentURL),
+        guard showsImages, let url = ImagePathResolver.resolve(path, relativeTo: documentURL),
               let image = ImageCache.shared.image(for: url, onLoad: { [weak self] in self?.restyleAndRelayout() }) else {
             return 0
         }
@@ -259,7 +346,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     private var isLayingOutImages = false
 
     private func layoutImages() {
-        guard !isLayingOutImages, let layoutManager, let textContainer, let textStorage else { return }
+        guard showsImages, !isLayingOutImages, let layoutManager, let textContainer, let textStorage else { return }
         isLayingOutImages = true
         defer { isLayingOutImages = false }
         layoutManager.ensureLayout(for: textContainer)

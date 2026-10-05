@@ -7,24 +7,36 @@ enum XTheme {
     static let border = Color.adaptive(light: 0xEFF3F4, dark: 0x2F3336)
     static let limit = 25_000
     static let columnWidth: CGFloat = 600
+
+    static let editorTheme = EditorTheme.post(
+        size: 15,
+        text: .adaptive(light: 0x0F1419, dark: 0xE7E9EA),
+        secondary: .adaptive(light: 0x536471, dark: 0x71767B),
+        accent: NSColor(blue),
+        codeBackground: NSColor.labelColor.withAlphaComponent(0.055)
+    )
 }
 
 struct XPostFeedView: View {
-    let text: String
+    @ObservedObject var document: MarkdownDocument
     let baseURL: URL?
     let profile: Profile
 
-    private var segments: [String] { MarkdownParser.threadSegments(text) }
+    private var text: String { document.text }
+    private var thread: [MarkdownParser.ThreadSegment] { MarkdownParser.thread(text) }
+    private var segments: [String] { thread.map(\.text) }
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 VStack(spacing: 0) {
                     header
+                    composer
                     ghostPost(seed: 0)
-                    ForEach(Array(segments.enumerated()), id: \.offset) { i, segment in
-                        XPostCell(markdown: segment, baseURL: baseURL, profile: profile,
-                                  isThread: segments.count > 1, isLast: i == segments.count - 1, index: i)
+                    ForEach(Array(thread.enumerated()), id: \.offset) { i, segment in
+                        XPostCell(markdown: segment.text, baseURL: baseURL, profile: profile,
+                                  isThread: thread.count > 1, isLast: i == thread.count - 1, index: i,
+                                  onEdit: { replace(segment, at: i, with: $0) })
                     }
                     ghostPost(seed: 1)
                     ghostPost(seed: 2)
@@ -34,7 +46,7 @@ struct XPostFeedView: View {
                 .overlay(alignment: .leading) { XTheme.border.frame(width: 1) }
                 .overlay(alignment: .trailing) { XTheme.border.frame(width: 1) }
                 .frame(maxWidth: .infinity)
-                .padding(.top, 36)
+                .padding(.top, 44)
             }
 
             HStack(spacing: 8) {
@@ -44,6 +56,16 @@ struct XPostFeedView: View {
             }
             .padding(16)
         }
+    }
+
+    /// Writes an edited post back into its slice of the document, keeping the `---` separators padded.
+    private func replace(_ segment: MarkdownParser.ThreadSegment, at index: Int, with edited: String) {
+        let ns = document.text as NSString
+        guard NSMaxRange(segment.range) <= ns.length else { return }
+        var replacement = edited
+        if index > 0, !replacement.hasPrefix("\n") { replacement = "\n" + replacement }
+        if index < thread.count - 1, !replacement.hasSuffix("\n") { replacement += "\n" }
+        document.text = ns.replacingCharacters(in: segment.range, with: replacement)
     }
 
     private var copyAlternatives: [(title: String, payload: () -> Exporter.Payload)] {
@@ -67,6 +89,32 @@ struct XPostFeedView: View {
             .frame(height: 53)
             XTheme.border.frame(height: 1)
         }
+    }
+
+    private var composer: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                AvatarView(profile: profile, size: 40)
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("What is happening?!")
+                        .font(.system(size: 20)).foregroundStyle(XTheme.secondary)
+                        .padding(.top, 8)
+                    HStack(spacing: 16) {
+                        ForEach(["photo", "list.bullet.rectangle", "face.smiling", "calendar", "mappin.and.ellipse"], id: \.self) {
+                            Image(systemName: $0).font(.system(size: 15)).foregroundStyle(XTheme.blue)
+                        }
+                        Spacer()
+                        Text("Post")
+                            .font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
+                            .padding(.horizontal, 16).padding(.vertical, 7)
+                            .background(XTheme.blue.opacity(0.5), in: Capsule())
+                    }
+                }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+            XTheme.border.frame(height: 1)
+        }
+        .opacity(0.8)
     }
 
     private func tab(_ title: String, active: Bool) -> some View {
@@ -121,12 +169,8 @@ struct XPostCell: View {
     var isThread = false
     var isLast = true
     var index = 0
+    var onEdit: (String) -> Void = { _ in }
     @State private var copied = false
-
-    private var attributed: AttributedString {
-        MarkdownRender.xAttributed(markdown)
-            .styled(baseFont: .system(size: 15), color: XTheme.text, codeFont: .system(size: 14, design: .monospaced), linkColor: XTheme.blue)
-    }
 
     private var images: [URL?] {
         MarkdownParser.images(in: markdown).map { ImagePathResolver.resolve($0.path, relativeTo: baseURL) }
@@ -163,15 +207,14 @@ struct XPostCell: View {
                     }
                     .font(.system(size: 15))
 
-                    if attributed.characters.isEmpty && images.isEmpty {
-                        Text(index == 0 ? "What is happening?!" : "Add another post…")
-                            .font(.system(size: 15)).foregroundStyle(XTheme.secondary)
-                    } else {
-                        Text(attributed)
-                            .lineSpacing(3)
-                            .textSelection(.enabled)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    PostEditor(text: markdown, theme: XTheme.editorTheme, documentURL: baseURL, onChange: onEdit)
+                        .overlay(alignment: .topLeading) {
+                            if markdown.isEmpty {
+                                Text(index == 0 ? "What is happening?!" : "Add another post…")
+                                    .font(.system(size: 15)).foregroundStyle(XTheme.secondary)
+                                    .allowsHitTesting(false)
+                            }
+                        }
 
                     if !images.isEmpty {
                         MediaGrid(urls: images, cornerRadius: 16)

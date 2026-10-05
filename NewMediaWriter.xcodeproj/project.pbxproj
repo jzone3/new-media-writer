@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		09297840DDE50A0AA5166B02 /* MarkdownEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C72382906EFC80C17854856 /* MarkdownEditor.swift */; };
+		131CAC27E5CADF0ECFE4249E /* PostEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 008E582564E2E57A265BDACD /* PostEditor.swift */; };
 		21339A2F9AED74189F0C737E /* MarkdownInline.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE9C69EB5F31A2A4EF5EB2D6 /* MarkdownInline.swift */; };
 		3CFAC08B9716C97B40067682 /* MarkdownRender.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB96E1EE1DED5511665CC62 /* MarkdownRender.swift */; };
 		4E70B2CC654002DCE0FF7C26 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 857FB0537EBDC2F7E2C27AE6 /* App.swift */; };
@@ -30,6 +31,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		008E582564E2E57A265BDACD /* PostEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostEditor.swift; sourceTree = "<group>"; };
 		02A6B07701A0C91E8F8E6012 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		16146E3C4E132AC4C91FE796 /* MarkdownDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownDocument.swift; sourceTree = "<group>"; };
 		168669D893552904F2B952F1 /* XPostFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XPostFeedView.swift; sourceTree = "<group>"; };
@@ -111,6 +113,7 @@
 				7D7FD21E42D044BC59C24E5F /* EditorTextView.swift */,
 				9C72382906EFC80C17854856 /* MarkdownEditor.swift */,
 				FBD62FA1B583B19444EAD33E /* MarkdownStyler.swift */,
+				008E582564E2E57A265BDACD /* PostEditor.swift */,
 			);
 			path = Editor;
 			sourceTree = "<group>";
@@ -243,6 +246,7 @@
 				7CE1B239A177C959FBA128BC /* MarkdownParser.swift in Sources */,
 				3CFAC08B9716C97B40067682 /* MarkdownRender.swift in Sources */,
 				FA2807432B702100ABBC0B7D /* MarkdownStyler.swift in Sources */,
+				131CAC27E5CADF0ECFE4249E /* PostEditor.swift in Sources */,
 				9EC00051F3FB0BF078402CD3 /* Profile.swift in Sources */,
 				C8ACD5416AFBE5CCC0B9E251 /* ScrollPassthrough.swift in Sources */,
 				C76258E2A058AA9F07326448 /* SettingsView.swift in Sources */,

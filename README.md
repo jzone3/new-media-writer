@@ -1,5 +1,7 @@
 # New Media Writer
 
+[![Built by Devin](https://raw.githubusercontent.com/club-cog/built-by-devin/main/badges/built-by-devin.svg)](https://builtbydevin.ai)
+
 A minimalist, focus-first Markdown writing app for macOS. Write once in Markdown, then preview the same file as it would appear in the feed:
 
 - **Plaintext** — the raw Markdown source.

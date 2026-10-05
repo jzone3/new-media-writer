@@ -41,6 +41,7 @@ struct MarkdownEditor: NSViewRepresentable {
         if textView.string != document.text {
             let sel = textView.selectedRange()
             textView.string = document.text
+            textView.restyleAndRelayout()
             let loc = min(sel.location, (document.text as NSString).length)
             textView.setSelectedRange(NSRange(location: loc, length: 0))
         }

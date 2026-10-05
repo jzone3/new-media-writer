@@ -120,25 +120,37 @@ enum MarkdownParser {
     }
 
     /// Splits the document into thread segments on horizontal rules (`---`).
-    static func threadSegments(_ text: String) -> [String] {
-        var segments: [String] = []
-        var current: [String] = []
+    struct ThreadSegment {
+        /// Everything between the surrounding `---` lines (untrimmed), in UTF-16 units of the source.
+        var range: NSRange
+        var text: String
+    }
+
+    static func thread(_ text: String) -> [ThreadSegment] {
+        let ns = text as NSString
+        var raw: [NSRange] = []
         var inCode = false
+        var start = 0
+        var offset = 0
         for line in text.components(separatedBy: "\n") {
+            let len = (line as NSString).length
             let t = line.trimmingCharacters(in: .whitespaces)
             if t.hasPrefix("```") { inCode.toggle() }
             if !inCode, isRule(t) {
-                segments.append(current.joined(separator: "\n"))
-                current = []
-            } else {
-                current.append(line)
+                raw.append(NSRange(location: start, length: offset - start))
+                start = min(offset + len + 1, ns.length)
             }
+            offset += len + 1
         }
-        segments.append(current.joined(separator: "\n"))
-        let cleaned = segments.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        let nonEmpty = cleaned.filter { !$0.isEmpty }
-        return nonEmpty.isEmpty ? [""] : nonEmpty
+        raw.append(NSRange(location: start, length: ns.length - start))
+        let segments = raw.map {
+            ThreadSegment(range: $0, text: ns.substring(with: $0).trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        let nonEmpty = segments.filter { !$0.text.isEmpty }
+        return nonEmpty.isEmpty ? [ThreadSegment(range: NSRange(location: 0, length: ns.length), text: "")] : nonEmpty
     }
+
+    static func threadSegments(_ text: String) -> [String] { thread(text).map(\.text) }
 
     static func isRule(_ t: String) -> Bool {
         guard t.count >= 3 else { return false }

@@ -20,6 +20,8 @@ struct EditorTheme {
     var accent: NSColor
     var codeBackground: NSColor
     var lineHeightMultiple: CGFloat
+    var paragraphSpacing: CGFloat = 10
+    var headingFontOverride: ((Int) -> NSFont)? = nil
 
     static let wysiwyg = EditorTheme(
         body: .systemFont(ofSize: 17, weight: .regular),
@@ -41,12 +43,29 @@ struct EditorTheme {
         lineHeightMultiple: 1.5
     )
 
+    /// Compact theme for post bodies embedded in feed cards: platform font size, flat headings.
+    static func post(size: CGFloat, text: NSColor, secondary: NSColor, accent: NSColor, codeBackground: NSColor,
+                     lineHeightMultiple: CGFloat = 1.3) -> EditorTheme {
+        EditorTheme(
+            body: .systemFont(ofSize: size),
+            mono: .monospacedSystemFont(ofSize: size - 1.5, weight: .regular),
+            text: text,
+            secondary: secondary,
+            accent: accent,
+            codeBackground: codeBackground,
+            lineHeightMultiple: lineHeightMultiple,
+            paragraphSpacing: 0,
+            headingFontOverride: { _ in .systemFont(ofSize: size, weight: .bold) }
+        )
+    }
+
     func headingFont(level: Int) -> NSFont {
+        if let headingFontOverride { return headingFontOverride(level) }
         switch level {
-        case 1: .systemFont(ofSize: 32, weight: .bold)
-        case 2: .systemFont(ofSize: 25, weight: .bold)
-        case 3: .systemFont(ofSize: 20, weight: .semibold)
-        default: .systemFont(ofSize: 17, weight: .semibold)
+        case 1: return .systemFont(ofSize: 32, weight: .bold)
+        case 2: return .systemFont(ofSize: 25, weight: .bold)
+        case 3: return .systemFont(ofSize: 20, weight: .semibold)
+        default: return .systemFont(ofSize: 17, weight: .semibold)
         }
     }
 }
@@ -65,6 +84,9 @@ final class MarkdownStyler {
     private static let link = try! NSRegularExpression(pattern: "(?<!!)\\[([^\\]\\n]+)\\]\\(([^)\\n]+)\\)")
     private static let inlineImage = MarkdownParser.imageRegex
 
+    /// Post themes render like the platforms do: blank lines are the only paragraph spacing, headings are plain bold lines.
+    private var flat: Bool { theme.headingFontOverride != nil }
+
     func restyle(_ storage: NSTextStorage) {
         let full = NSRange(location: 0, length: storage.length)
         guard full.length > 0 else { return }
@@ -75,7 +97,7 @@ final class MarkdownStyler {
 
         let base = NSMutableParagraphStyle()
         base.lineHeightMultiple = theme.lineHeightMultiple
-        base.paragraphSpacing = raw ? 0 : 10
+        base.paragraphSpacing = raw ? 0 : theme.paragraphSpacing
         storage.setAttributes([
             .font: theme.body,
             .foregroundColor: theme.text,
@@ -156,9 +178,9 @@ final class MarkdownStyler {
             let markerLen = level + 1
             marker(storage, NSRange(location: range.location + leading, length: min(markerLen, range.length - leading)))
             paragraph(storage, range) { p in
-                p.lineHeightMultiple = 1.2
-                p.paragraphSpacingBefore = level == 1 ? 14 : 10
-                p.paragraphSpacing = 6
+                p.lineHeightMultiple = self.flat ? self.theme.lineHeightMultiple : 1.2
+                p.paragraphSpacingBefore = self.flat ? 0 : (level == 1 ? 14 : 10)
+                p.paragraphSpacing = self.flat ? self.theme.paragraphSpacing : 6
             }
             inline(storage, range)
             return
@@ -170,8 +192,8 @@ final class MarkdownStyler {
             storage.addAttribute(.mdRule, value: true, range: range)
             paragraph(storage, range) { p in
                 p.alignment = .center
-                p.paragraphSpacing = 14
-                p.paragraphSpacingBefore = 6
+                p.paragraphSpacing = self.flat ? 0 : 14
+                p.paragraphSpacingBefore = self.flat ? 0 : 6
             }
             return
         }
@@ -197,7 +219,7 @@ final class MarkdownStyler {
             paragraph(storage, range) { p in
                 p.headIndent = 22
                 p.firstLineHeadIndent = 22
-                p.paragraphSpacing = 4
+                p.paragraphSpacing = self.flat ? 0 : 4
             }
             inline(storage, range)
             return
@@ -211,7 +233,7 @@ final class MarkdownStyler {
             paragraph(storage, range) { p in
                 p.firstLineHeadIndent = indent
                 p.headIndent = indent + (item.ordered ? 24 : 18)
-                p.paragraphSpacing = 3
+                p.paragraphSpacing = self.flat ? 0 : 3
             }
             inline(storage, range)
             return
