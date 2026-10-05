@@ -3,20 +3,22 @@
 
 The window is WIDTH x HEIGHT points (see scripts/build-dmg.sh, which positions the app icon and the
 Applications link on either side of the arrow drawn here). Dark ASCII field (same look as the share card
-and launch video) with a white card behind the icon row: Finder always draws icon labels in black, so the card
-is what keeps "New Media Writer" / "Applications" readable, and it gives the arrow a quiet place to sit.
+and launch video) with a translucent white card behind each icon: Finder always draws icon labels in black, so the
+cards are what keep "New Media Writer" / "Applications" readable; a white arrow sits between them.
 """
 import os
 import random
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 
 WIDTH, HEIGHT = 660, 400
 ARROW_Y = 180          # vertical centre of the icons (build-dmg.sh uses the same value)
 ARROW_LEN, HEAD, STROKE = 56, 12, 2
 BG = (13, 13, 13)
-CARD = (72, 100, 588, 288)  # rounded white card; icons (128pt) + Finder labels fall inside it
+# Two translucent white cards, one per icon (128pt icon + Finder label inside); the arrow sits between them.
+CARDS = [(75, 100, 255, 288), (405, 100, 585, 288)]
 CARD_RADIUS = 14
-ARROW_COLOR = (29, 29, 31)
+CARD_ALPHA = 224
+ARROW_COLOR = "white"
 CW, CH = 9, 14         # glyph cell (points)
 RAMP = ". . . : : - = + * # % @ 8 0 B M".split()
 OUT = os.path.join(os.path.dirname(__file__), "..", "dmg")
@@ -51,12 +53,12 @@ def render(scale):
             a = 0.10 + 0.32 * n
             v = int(13 + a * 150)
             d.text((x * scale, y * scale), ch, font=font, fill=(v, v, v))
-    shadow = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    ImageDraw.Draw(shadow).rounded_rectangle([(CARD[0] - 2) * scale, (CARD[1] + 4) * scale, (CARD[2] + 2) * scale, (CARD[3] + 10) * scale],
-                                             radius=(CARD_RADIUS + 2) * scale, fill=(0, 0, 0, 170))
-    img.paste(shadow.filter(ImageFilter.GaussianBlur(10 * scale)), (0, 0), shadow.filter(ImageFilter.GaussianBlur(10 * scale)))
+    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    od = ImageDraw.Draw(overlay)
+    for card in CARDS:
+        od.rounded_rectangle([v * scale for v in card], radius=CARD_RADIUS * scale, fill=(255, 255, 255, CARD_ALPHA))
+    img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle([v * scale for v in CARD], radius=CARD_RADIUS * scale, fill="white")
     cx, cy = WIDTH / 2, ARROW_Y
     x0, x1 = (cx - ARROW_LEN / 2) * scale, (cx + ARROW_LEN / 2) * scale
     y, w = cy * scale, STROKE * scale

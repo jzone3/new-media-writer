@@ -37,7 +37,8 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         guard takesFocusOnAppear, let window else { return }
         DispatchQueue.main.async { [weak self, weak window] in
             guard let self, let window, self.window === window else { return }
-            if window.firstResponder is NSTextView { return }
+            // Another document/card editor keeps focus; a closing ⌘K picker (field editor) does not.
+            if window.firstResponder is EditorTextView { return }
             window.makeFirstResponder(self)
         }
     }
