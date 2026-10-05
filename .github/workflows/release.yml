@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+defaults:
+  run:
+    shell: bash
+
 env:
   APP_NAME: New Media Writer
   SCHEME: NewMediaWriter
@@ -26,10 +30,16 @@ jobs:
         id: version
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "marketing=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+            VERSION="${GITHUB_REF#refs/tags/v}"
+            # CFBundleShortVersionString must be dotted integers; also keeps the tag from reaching a shell unescaped.
+            if [[ ! "$VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+              echo "Tag v$VERSION is not a valid version (expected vMAJOR.MINOR.PATCH)" >&2
+              exit 1
+            fi
           else
-            echo "marketing=0.0.0-dev" >> "$GITHUB_OUTPUT"
+            VERSION="0.0.$GITHUB_RUN_NUMBER"
           fi
+          echo "marketing=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Import Developer ID certificate
         env:
@@ -53,6 +63,7 @@ jobs:
       - name: Archive (signed, hardened runtime)
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          VERSION: ${{ steps.version.outputs.marketing }}
         run: |
           xcodebuild archive \
             -project NewMediaWriter.xcodeproj \
@@ -60,7 +71,7 @@ jobs:
             -configuration Release \
             -archivePath "$RUNNER_TEMP/app.xcarchive" \
             -derivedDataPath build \
-            MARKETING_VERSION="${{ steps.version.outputs.marketing }}" \
+            MARKETING_VERSION="$VERSION" \
             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Developer ID Application" \
@@ -88,8 +99,9 @@ jobs:
         env:
           NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
           NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          VERSION: ${{ steps.version.outputs.marketing }}
         run: |
-          DMG="New-Media-Writer-${{ steps.version.outputs.marketing }}.dmg"
+          DMG="New-Media-Writer-$VERSION.dmg"
           echo "dmg=$DMG" >> "$GITHUB_ENV"
           STAGE="$RUNNER_TEMP/dmg"
           mkdir -p "$STAGE"
