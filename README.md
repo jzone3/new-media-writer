@@ -62,7 +62,7 @@ from Xcode.
 | LinkedIn | ⌘4 |
 | Slack | ⌘5 |
 | Copy for current view | ⇧⌘C |
-| Bold / Italic / Inline code (toggle `**` / `*` / `` ` `` around the selection) | ⌘B / ⌘I / ⌘E |
+| Bold / Italic / Strikethrough (toggle `**` / `*` / `~~` around the selection) | ⌘B / ⌘I / ⌘E |
 | Switch view by typing its name (e.g. "sl" → Slack) | ⌘K |
 | Previous / next view | ⌥⌘← / ⌥⌘→ |
 | Insert link (uses a URL from the clipboard if there is one) | ⇧⌘K |
