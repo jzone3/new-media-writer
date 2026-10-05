@@ -203,7 +203,7 @@ footer a:hover{color:var(--ink)}
   .doc p,.doc ul{margin-bottom:20px}
   .x-col{left:0;width:100%;top:44px;border:0}
   .x-tabs{height:44px}
-  .x-col>.ghost:first-of-type{display:none}
+  .x-col>.x-tabs+.ghost{display:none}
   .x-post{padding:12px 14px}
   .x-col .post-text{font-size:14px}
   .li-col{left:10px;right:10px;width:auto;top:54px}
@@ -212,9 +212,11 @@ footer a:hover{color:var(--ink)}
   .sl-side{display:none}
   .sl-top{margin-top:44px}
   .view-slack .sl-msg .post-text{font-size:13px;line-height:1.45}
+  .view-slack .sl-msgs{display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:10px}
   .view-slack .sl-divider{margin:10px 0}
 }
 @media (prefers-reduced-motion:reduce){
+  .demo h1.script{transition:none}
   .cursor{display:none}
   .view,.btn{transition:none}
 }

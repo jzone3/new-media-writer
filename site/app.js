@@ -85,7 +85,9 @@ That to secure these rights, Governments are instituted among Men, deriving thei
     const H = parseFloat(cs.getPropertyValue('--win-h')) || 600;
     let s = demo.clientWidth / W;
     if (mobile.matches) {
-      s = Math.min((demo.clientWidth - 32) / W, Math.max(300, innerHeight - 72 - 190) / H);
+      const byWidth = (demo.clientWidth - 32) / W;
+      const byHeight = Math.max(300, innerHeight - 72 - 190) / H;
+      s = Math.max(Math.min(byWidth, byHeight), byWidth * 0.85);
       scaleBox.style.width = `${W * s}px`;
       scaleBox.style.height = `${H * s}px`;
     } else {
