@@ -103,7 +103,9 @@ enum Exporter {
             let intent = run.inlinePresentationIntent ?? []
             if intent.contains(.code) { out += wrap(s, "`"); continue }
             var piece = s
-            if let link = run.link { piece = "<\(link.absoluteString)|\(piece)>" }
+            if let link = run.link {
+                piece = MarkdownInline.isBareURL(piece, link) ? link.absoluteString : "<\(link.absoluteString)|\(piece)>"
+            }
             if intent.contains(.strikethrough) { piece = wrap(piece, "~") }
             if intent.contains(.emphasized) { piece = wrap(piece, "_") }
             if intent.contains(.stronglyEmphasized) { piece = wrap(piece, "*") }

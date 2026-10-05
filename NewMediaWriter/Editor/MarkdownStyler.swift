@@ -80,7 +80,8 @@ final class MarkdownStyler {
     var imageHeight: (String) -> CGFloat = { _ in 0 }
 
     private static let inlineCode = try! NSRegularExpression(pattern: "`([^`\\n]+)`")
-    private static let bold = try! NSRegularExpression(pattern: "(\\*\\*|__)(?=\\S)(.+?)(?<=\\S)\\1")
+    private static let boldItalic = try! NSRegularExpression(pattern: "(\\*\\*\\*|___)(?=\\S)(.+?)(?<=\\S)\\1")
+    private static let bold = try! NSRegularExpression(pattern: "(?<![*_])(\\*\\*|__)(?=[^\\s*_])(.+?)(?<=[^\\s*_])\\1(?![*_])")
     private static let italic = try! NSRegularExpression(pattern: "(?<![\\w*_])(\\*|_)(?=\\S)([^*_\\n]+?)(?<=\\S)\\1(?![\\w*_])")
     private static let strike = try! NSRegularExpression(pattern: "~~(?=\\S)(.+?)(?<=\\S)~~")
     private static let link = try! NSRegularExpression(pattern: "(?<!!)\\[([^\\]\\n]+)\\]\\(([^)\\n]+)\\)")
@@ -154,11 +155,11 @@ final class MarkdownStyler {
         if MarkdownParser.isRule(trimmed) || trimmed.hasPrefix(">") {
             apply(storage, range, font: theme.mono, color: theme.secondary)
         }
-        for regex in [Self.inlineCode, Self.bold, Self.italic, Self.strike, Self.link, Self.inlineImage] {
+        for regex in [Self.inlineCode, Self.boldItalic, Self.bold, Self.italic, Self.strike, Self.link, Self.inlineImage] {
             regex.enumerateMatches(in: storage.string, range: range) { m, _, _ in
                 guard let m else { return }
                 let r = m.range
-                if regex === Self.bold {
+                if regex === Self.bold || regex === Self.boldItalic {
                     storage.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: self.theme.body.pointSize, weight: .bold), range: r)
                 } else if regex === Self.link || regex === Self.inlineImage {
                     storage.addAttribute(.foregroundColor, value: self.theme.accent, range: m.range(at: regex === Self.link ? 2 : 2))
@@ -258,6 +259,14 @@ final class MarkdownStyler {
             self.marker(storage, NSRange(location: m.range.location + m.range.length - 1, length: 1))
             storage.addAttribute(.font, value: self.theme.mono, range: m.range(at: 1))
             storage.addAttribute(.mdCodeBackground, value: true, range: m.range(at: 1))
+        }
+
+        Self.boldItalic.enumerateMatches(in: text, range: range) { m, _, _ in
+            guard let m else { return }
+            self.marker(storage, NSRange(location: m.range.location, length: 3))
+            self.marker(storage, NSRange(location: m.range.location + m.range.length - 3, length: 3))
+            self.addTrait(storage, m.range(at: 2), trait: .boldFontMask)
+            self.addTrait(storage, m.range(at: 2), trait: .italicFontMask)
         }
 
         Self.bold.enumerateMatches(in: text, range: range) { m, _, _ in
