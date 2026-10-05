@@ -55,32 +55,47 @@ That to secure these rights, Governments are instituted among Men, deriving thei
   clicks.push({ view: 'plaintext', moveStart: t, clickAt: t + MOVE + 90 });
   const END = t + MOVE + 90 + 900;
 
-  // Phones: the demo leads, cropped to its content column via --crop-x/--crop-w (style.css), and the
-  // script title slides in under it once the window is on screen. Desktop keeps the title on top.
+  // Phones: the demo section leads the page (moved in the DOM so reading order matches), with the script
+  // title under the window; it fades in once the page has settled. Desktop keeps the title in the hero.
   const mobile = matchMedia('(max-width: 768px)');
-  const title = document.querySelector('.hero h1.script');
+  const hero = document.querySelector('.hero');
+  const demo = scaleBox.parentElement;
+  const title = document.querySelector('h1.script');
+  let titleTimer = 0;
   const placeTitle = () => {
+    clearTimeout(titleTimer);
     if (!title) return;
     if (mobile.matches) {
-      if (title.parentElement !== scaleBox.parentElement) scaleBox.parentElement.appendChild(title);
-      setTimeout(() => title.classList.add('in'), reduce ? 0 : 700);
-    } else if (title.parentElement !== document.querySelector('.hero')) {
-      document.querySelector('.hero').prepend(title);
-      title.classList.remove('in');
+      if (demo.nextElementSibling !== hero) hero.parentElement.insertBefore(demo, hero);
+      if (title.parentElement !== demo) { title.classList.remove('in'); demo.appendChild(title); }
+      titleTimer = setTimeout(() => title.classList.add('in'), reduce ? 0 : 700);
+    } else {
+      if (hero.nextElementSibling !== demo) hero.parentElement.insertBefore(demo, hero.nextElementSibling);
+      if (title.parentElement !== hero) { title.classList.remove('in'); hero.prepend(title); }
     }
   };
   placeTitle();
   mobile.addEventListener('change', placeTitle);
 
-  // Keep the 960x600 window crisp at any width.
+  // Keep the window crisp at any width: scale the --win-w x --win-h window to the box. On phones the box
+  // is also capped by height so window + title fit the first screen.
   const fit = () => {
     const cs = getComputedStyle(scaleBox);
-    const cropX = parseFloat(cs.getPropertyValue('--crop-x')) || 0;
-    const cropW = parseFloat(cs.getPropertyValue('--crop-w')) || 960;
-    const s = scaleBox.clientWidth / cropW;
-    win.style.transform = `translate(${-cropX * s}px, 0) scale(${s})`;
+    const W = parseFloat(cs.getPropertyValue('--win-w')) || 960;
+    const H = parseFloat(cs.getPropertyValue('--win-h')) || 600;
+    let s = demo.clientWidth / W;
+    if (mobile.matches) {
+      s = Math.min((demo.clientWidth - 32) / W, Math.max(300, innerHeight - 72 - 190) / H);
+      scaleBox.style.width = `${W * s}px`;
+      scaleBox.style.height = `${H * s}px`;
+    } else {
+      scaleBox.style.width = scaleBox.style.height = '';
+      s = scaleBox.clientWidth / W;
+    }
+    win.style.transform = `scale(${s})`;
   };
-  new ResizeObserver(fit).observe(scaleBox);
+  new ResizeObserver(fit).observe(demo);
+  addEventListener('resize', fit);
   fit();
 
   const views = [...stage.querySelectorAll('.view')];
@@ -94,7 +109,7 @@ That to secure these rights, Governments are instituted among Men, deriving thei
     const b = buttons.find(b => b.dataset.view === name);
     return { x: b.offsetLeft + b.offsetParent.offsetLeft + b.offsetWidth / 2 - 2, y: b.offsetTop + b.offsetParent.offsetTop + b.offsetHeight / 2 - 1 };
   };
-  const PARK = { x: 600, y: 360 };
+  const PARK = { get x() { return win.offsetWidth * 0.62; }, get y() { return win.offsetHeight * 0.6; } };
   const ease = p => 1 - Math.pow(1 - p, 3);
   const clamp = v => Math.max(0, Math.min(1, v));
   const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
