@@ -6,6 +6,7 @@ struct SettingsView: View {
     @AppStorage(ProfileKeys.headline) private var headline = "Builder · Writer"
     @AppStorage(ProfileKeys.avatarPath) private var avatarPath = ""
     @AppStorage(ProfileKeys.slackChannel) private var slackChannel = "general"
+    @State private var isDefaultApp = DefaultApp.isDefault
 
     var body: some View {
         Form {
@@ -28,6 +29,17 @@ struct SettingsView: View {
                 TextField("Handle", text: $handle, prompt: Text("without the @"))
                 TextField("LinkedIn headline", text: $headline)
                 TextField("Slack channel", text: $slackChannel, prompt: Text("general"))
+            }
+            Section("Markdown files") {
+                HStack {
+                    Text(isDefaultApp ? "New Media Writer opens .md files by default." : "Another app opens .md files.")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Make Default") {
+                        DefaultApp.makeDefault { _ in isDefaultApp = DefaultApp.isDefault }
+                    }
+                    .disabled(isDefaultApp)
+                }
             }
         }
         .formStyle(.grouped)

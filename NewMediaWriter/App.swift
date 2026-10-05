@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct NewMediaWriterApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     init() { ScrollPassthrough.install() }
 
     var body: some Scene {
