@@ -63,5 +63,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             DefaultApp.promptIfNeeded()
         }
+        UpdateChecker.shared.checkOnLaunch()
     }
 }
