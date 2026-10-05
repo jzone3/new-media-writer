@@ -3,7 +3,16 @@ import UniformTypeIdentifiers
 
 enum DefaultApp {
     static let promptedKey = "defaultAppPrompted"
-    static let markdown = UTType("net.daringfireball.markdown") ?? .plainText
+    static let markdown = UTType(importedAs: "net.daringfireball.markdown", conformingTo: .plainText)
+
+    /// True when running from a mounted disk image or an App Translocation
+    /// sandbox; registering that copy would break once the volume is ejected.
+    static var isRunningFromTemporaryLocation: Bool {
+        let url = Bundle.main.bundleURL.resolvingSymlinksInPath()
+        if url.path.hasPrefix("/Volumes/") || url.path.contains("/AppTranslocation/") { return true }
+        let values = try? url.resourceValues(forKeys: [.volumeIsReadOnlyKey, .volumeIsEjectableKey])
+        return values?.volumeIsReadOnly == true || values?.volumeIsEjectable == true
+    }
 
     static var isDefault: Bool {
         guard let current = NSWorkspace.shared.urlForApplication(toOpen: markdown) else { return false }
@@ -18,7 +27,7 @@ enum DefaultApp {
 
     static func promptIfNeeded() {
         let defaults = UserDefaults.standard
-        guard !defaults.bool(forKey: promptedKey), !isDefault else { return }
+        guard !defaults.bool(forKey: promptedKey), !isDefault, !isRunningFromTemporaryLocation else { return }
         defaults.set(true, forKey: promptedKey)
 
         let alert = NSAlert()

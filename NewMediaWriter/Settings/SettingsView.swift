@@ -32,13 +32,13 @@ struct SettingsView: View {
             }
             Section("Markdown files") {
                 HStack {
-                    Text(isDefaultApp ? "New Media Writer opens .md files by default." : "Another app opens .md files.")
+                    Text(markdownStatus)
                         .foregroundStyle(.secondary)
                     Spacer()
                     Button("Make Default") {
                         DefaultApp.makeDefault { _ in isDefaultApp = DefaultApp.isDefault }
                     }
-                    .disabled(isDefaultApp)
+                    .disabled(isDefaultApp || DefaultApp.isRunningFromTemporaryLocation)
                 }
             }
         }
@@ -49,6 +49,12 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             isDefaultApp = DefaultApp.isDefault
         }
+    }
+
+    private var markdownStatus: String {
+        if isDefaultApp { return "New Media Writer opens .md files by default." }
+        if DefaultApp.isRunningFromTemporaryLocation { return "Move New Media Writer to Applications first." }
+        return "Another app opens .md files."
     }
 
     private func chooseAvatar() {
