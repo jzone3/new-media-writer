@@ -6,6 +6,23 @@ import UniformTypeIdentifiers
 final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDelegate {
     let emojiPopup = EmojiPopup()
 
+    var overlayTracking: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        installOverlayCursorTracking()
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        _ = updateCursorForOverlays(event)
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        if updateCursorForOverlays(event) { return }
+        super.cursorUpdate(with: event)
+    }
+
     override func viewWillMove(toWindow newWindow: NSWindow?) {
         if newWindow == nil { emojiPopup.hide() }
         super.viewWillMove(toWindow: newWindow)
