@@ -40,7 +40,8 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
                   let tag = object["tag_name"] as? String, let version = Version(tag),
                   let assets = object["assets"] as? [[String: Any]],
                   let asset = assets.first(where: { $0["name"] as? String == UpdateChecker.assetName }),
-                  let url = (asset["browser_download_url"] as? String).flatMap(URL.init(string:)) else { return nil }
+                  let url = (asset["browser_download_url"] as? String).flatMap(URL.init(string:)),
+                  url.scheme == "https", url.host == "github.com" else { return nil }
             self.version = version
             downloadURL = url
         }
@@ -51,6 +52,7 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
     }
 
     @Published private(set) var isChecking = false
+    private var downloadSession: URLSession?
     private var downloadTask: URLSessionDownloadTask?
     private var progressWindow: UpdateProgressWindow?
     private var pendingRelease: Release?
@@ -139,6 +141,7 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
         window.show()
         let session = URLSession(configuration: .default, delegate: self, delegateQueue: .main)
         let task = session.downloadTask(with: release.downloadURL)
+        downloadSession = session
         downloadTask = task
         task.resume()
     }
@@ -149,6 +152,8 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
     }
 
     private func finishDownload() {
+        downloadSession?.invalidateAndCancel()
+        downloadSession = nil
         downloadTask = nil
         pendingRelease = nil
         progressWindow?.close()
@@ -186,7 +191,11 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
             DispatchQueue.main.async {
                 switch result {
                 case .success(let staged):
-                    self.relaunch(replacing: bundleURL, with: staged, cleaning: workDir)
+                    self.swap = (old: bundleURL, staged: staged, workDir: workDir)
+                    NSDocumentController.shared.reviewUnsavedDocuments(
+                        withAlertTitle: "Install New Media Writer \(release.version) and relaunch?", cancellable: true,
+                        delegate: self, didReviewAllSelector: #selector(self.didReviewUnsavedDocuments(_:didReviewAll:contextInfo:)),
+                        contextInfo: nil)
                 case .failure(let error):
                     try? FileManager.default.removeItem(at: workDir)
                     self.finishDownload()
@@ -208,8 +217,38 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
         }
         let staged = bundleURL.deletingLastPathComponent().appendingPathComponent(".\(bundleURL.lastPathComponent).update")
         try? FileManager.default.removeItem(at: staged)
-        try FileManager.default.copyItem(at: app, to: staged)
+        do {
+            try FileManager.default.copyItem(at: app, to: staged)
+            try verify(staged)
+        } catch {
+            try? FileManager.default.removeItem(at: staged)
+            throw error
+        }
         return staged
+    }
+
+    /// The downloaded app must be this app (same bundle identifier) with an intact signature from the same team.
+    private static func verify(_ app: URL) throws {
+        let identifier = Bundle(url: app)?.bundleIdentifier
+        guard identifier == Bundle.main.bundleIdentifier else {
+            throw NSError(domain: "UpdateChecker", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "The downloaded app is \(identifier ?? "unknown"), not New Media Writer."])
+        }
+        var arguments = ["--verify", "--deep", "--strict"]
+        if let team = ownTeamIdentifier {
+            arguments.append("-R=anchor apple generic and certificate leaf[subject.OU] = \"\(team)\"")
+        }
+        try run("/usr/bin/codesign", arguments + [app.path])
+    }
+
+    private static var ownTeamIdentifier: String? {
+        var code: SecCode?
+        var staticCode: SecStaticCode?
+        var info: CFDictionary?
+        guard SecCodeCopySelf([], &code) == errSecSuccess, let code,
+              SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess, let staticCode,
+              SecCodeCopySigningInformation(staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &info) == errSecSuccess else { return nil }
+        return (info as? [String: Any])?[kSecCodeInfoTeamIdentifier as String] as? String
     }
 
     private static func run(_ launchPath: String, _ arguments: [String]) throws {
@@ -228,17 +267,37 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
         }
     }
 
-    /// Hands the swap to a detached shell that waits for this process to exit, so the bundle is never replaced while running.
+    private var swap: (old: URL, staged: URL, workDir: URL)?
+
+    @objc private func didReviewUnsavedDocuments(_ controller: NSDocumentController, didReviewAll: Bool, contextInfo: UnsafeMutableRawPointer?) {
+        guard let swap else { return }
+        self.swap = nil
+        if didReviewAll {
+            relaunch(replacing: swap.old, with: swap.staged, cleaning: swap.workDir)
+        } else {
+            try? FileManager.default.removeItem(at: swap.staged)
+            try? FileManager.default.removeItem(at: swap.workDir)
+            finishDownload()
+        }
+    }
+
+    /// Hands the swap to a detached shell that waits for this process to exit, so the bundle is never replaced while
+    /// running. A failed rename puts the old app back and clears the check date so the next launch offers the update again.
     private func relaunch(replacing old: URL, with staged: URL, cleaning workDir: URL) {
         let script = """
         while kill -0 "$1" 2>/dev/null; do sleep 0.2; done
-        if mv "$2" "$2.old" && mv "$3" "$2"; then rm -rf "$2.old"; else mv "$2.old" "$2" 2>/dev/null; fi
+        if mv "$2" "$2.old" && mv "$3" "$2"; then
+          rm -rf "$2.old"
+        else
+          mv "$2.old" "$2" 2>/dev/null; rm -rf "$3"; defaults delete "$5" "$6" 2>/dev/null
+        fi
         rm -rf "$4"
         open "$2"
         """
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", script, "sh", String(ProcessInfo.processInfo.processIdentifier), old.path, staged.path, workDir.path]
+        process.arguments = ["-c", script, "sh", String(ProcessInfo.processInfo.processIdentifier), old.path, staged.path, workDir.path,
+                             Bundle.main.bundleIdentifier ?? "", Self.lastCheckKey]
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
