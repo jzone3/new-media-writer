@@ -57,7 +57,7 @@ struct XPostFeedView: View {
 
             HStack(spacing: 8) {
                 CopyButton(payload: { Exporter.xThread(text) }, alternatives: copyAlternatives)
-                CharacterBadge(count: totalCount, limit: XTheme.limit,
+                CharacterBadge(count: longestPostCount, limit: XTheme.limit,
                                detail: segments.count > 1 ? "\(segments.count) posts" : nil)
             }
             .padding(16)
@@ -119,8 +119,8 @@ struct XPostFeedView: View {
         }
     }
 
-    private var totalCount: Int {
-        segments.map { String(MarkdownRender.xAttributed($0).characters).count }.reduce(0, +)
+    private var longestPostCount: Int {
+        segments.map { MarkdownRender.xCount(String(MarkdownRender.xAttributed($0).characters)) }.max() ?? 0
     }
 
     private var header: some View {

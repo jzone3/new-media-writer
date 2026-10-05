@@ -35,6 +35,13 @@ struct MarkdownEditor: NSViewRepresentable {
         return scroll
     }
 
+    static func dismantleNSView(_ scroll: NSScrollView, coordinator: Coordinator) {
+        // The text view registers undo operations with itself as the unretained target; switching
+        // views destroys it, so a later ⌘Z would message a freed object.
+        guard let textView = scroll.documentView as? EditorTextView else { return }
+        coordinator.parent.undoManager?.removeAllActions(withTarget: textView)
+    }
+
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         guard let textView = scroll.documentView as? EditorTextView else { return }
         context.coordinator.parent = self
