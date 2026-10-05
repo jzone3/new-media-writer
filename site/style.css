@@ -94,8 +94,6 @@ h1{font-size:clamp(40px,7vw,72px);line-height:1.02;letter-spacing:-.035em;font-w
 .x-tabs span{flex:1;display:grid;place-items:center;color:#536471;font-weight:500;position:relative;height:100%}
 .x-tabs span.on{color:#0f1419;font-weight:700}
 .x-tabs span.on::after{content:"";position:absolute;bottom:0;width:56px;height:4px;border-radius:2px;background:#1d9bf0}
-.x-compose{display:flex;align-items:center;gap:12px;padding:14px 16px 14px;border-bottom:1px solid #eff3f4}
-.x-compose .ph{flex:1;font-size:20px;color:#536471}
 .x-post-btn{background:#8ecdf8;color:#fff;font-weight:700;padding:8px 16px;border-radius:999px;font-size:15px;align-self:flex-end}
 .x-post{display:flex;gap:12px;padding:12px 16px;border-top:1px solid #eff3f4;border-bottom:1px solid #eff3f4}
 .x-body{flex:1;min-width:0}
