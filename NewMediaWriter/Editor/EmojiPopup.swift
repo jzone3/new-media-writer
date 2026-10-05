@@ -24,15 +24,18 @@ final class EmojiPopup {
         guard !items.isEmpty else { hide(); return }
         if items != self.items { selection = 0 }
         self.items = items
+        if panel.contentView !== host {
+            host.autoresizingMask = [.width, .height]
+            panel.contentView = host
+        }
         render()
-        let size = host.fittingSize
+        let size = EmojiList.size(rows: items.count)
         var origin = NSPoint(x: caret.minX - 8, y: caret.minY - size.height - 4)
         if let screen = parent.screen?.visibleFrame {
             origin.x = min(origin.x, screen.maxX - size.width - 8)
             if origin.y < screen.minY { origin.y = caret.maxY + 4 }
         }
         panel.setFrame(NSRect(origin: origin, size: size), display: true)
-        panel.contentView = host
         if panel.parent == nil { parent.addChildWindow(panel, ordered: .above) }
         panel.orderFront(nil)
     }
@@ -58,7 +61,6 @@ final class EmojiPopup {
 
     private func render() {
         host.rootView = list
-        host.setFrameSize(host.fittingSize)
     }
 
     private var list: EmojiList {
@@ -78,8 +80,19 @@ private struct EmojiList: View {
     let onHover: (Int) -> Void
     let onPick: (EmojiCatalog.Entry) -> Void
 
+    static let rowWidth: CGFloat = 260
+    static let rowHeight: CGFloat = 26
+    static let rowSpacing: CGFloat = 1
+    static let inset: CGFloat = 6
+
+    /// Fixed geometry, so the panel can be sized without asking SwiftUI (fittingSize is unreliable before first layout).
+    static func size(rows: Int) -> NSSize {
+        NSSize(width: rowWidth + inset * 2,
+               height: CGFloat(rows) * rowHeight + CGFloat(max(rows - 1, 0)) * rowSpacing + inset * 2)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .leading, spacing: Self.rowSpacing) {
             ForEach(Array(items.enumerated()), id: \.element) { i, e in
                 HStack(spacing: 10) {
                     Text(e.emoji).font(.system(size: 17))
@@ -87,8 +100,7 @@ private struct EmojiList: View {
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .frame(width: 260, alignment: .leading)
+                .frame(width: Self.rowWidth, height: Self.rowHeight, alignment: .leading)
                 .foregroundStyle(i == selection ? Color.white : Color.primary)
                 .background(i == selection ? Color.accentColor : Color.clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 .contentShape(Rectangle())
@@ -96,9 +108,8 @@ private struct EmojiList: View {
                 .onTapGesture { onPick(e) }
             }
         }
-        .padding(6)
+        .padding(Self.inset)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(.primary.opacity(0.12)))
-        .fixedSize()
     }
 }
