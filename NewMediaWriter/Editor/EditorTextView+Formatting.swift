@@ -1,6 +1,8 @@
 import AppKit
 
 /// ⌘B / ⌘I / ⌘E / ⌘K toggle markdown markers around the selection instead of rich-text attributes.
+/// All edits go through `insertText(_:replacementRange:)`, which runs shouldChangeText/didChangeText
+/// and registers undo itself; calling shouldChangeText here as well would register the undo twice.
 extension EditorTextView {
     @objc func toggleBoldface(_ sender: Any?) { toggleMarker("**") }
     @objc func toggleItalics(_ sender: Any?) { toggleMarker("*") }
@@ -14,7 +16,6 @@ extension EditorTextView {
         let clip = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let url = clip.hasPrefix("http://") || clip.hasPrefix("https://") ? clip : ""
         let text = "[\(selected)](\(url))"
-        guard shouldChangeText(in: sel, replacementString: text) else { return }
         breakUndoCoalescing()
         insertText(text, replacementRange: sel)
         breakUndoCoalescing()
@@ -42,7 +43,6 @@ extension EditorTextView {
 
         if item.content.trimmingCharacters(in: .whitespaces).isEmpty {
             let markerRange = NSRange(location: para.location, length: contentStart - para.location)
-            guard shouldChangeText(in: markerRange, replacementString: "") else { return }
             insertText("", replacementRange: markerRange)
             return
         }
@@ -52,7 +52,6 @@ extension EditorTextView {
             next = "\(n + 1)" + prefix.drop { $0.isNumber }
         }
         let insert = "\n" + leading + next
-        guard shouldChangeText(in: sel, replacementString: insert) else { return }
         insertText(insert, replacementRange: sel)
     }
 
@@ -80,7 +79,7 @@ extension EditorTextView {
             return leading + (ordered ? "\(n). " : "- ") + body
         }
         let newText = out.joined(separator: "\n") + (trailingNewline ? "\n" : "")
-        guard newText != text, shouldChangeText(in: range, replacementString: newText) else { return }
+        guard newText != text else { return }
         breakUndoCoalescing()
         insertText(newText, replacementRange: range)
         breakUndoCoalescing()
@@ -100,7 +99,6 @@ extension EditorTextView {
         let m = marker.count
 
         func replace(_ range: NSRange, with text: String, select: NSRange) {
-            guard shouldChangeText(in: range, replacementString: text) else { return }
             breakUndoCoalescing()
             insertText(text, replacementRange: range)
             breakUndoCoalescing()
