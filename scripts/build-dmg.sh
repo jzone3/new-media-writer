@@ -17,12 +17,15 @@ WORK="$(mktemp -d)"
 STAGE="$WORK/stage"
 RW="$WORK/rw.dmg"
 MOUNT="/Volumes/$VOLNAME"
+ATTACHED=""
 mounted() { mount | grep -q " on $MOUNT "; }
 cleanup() {
-  if mounted; then hdiutil detach "$MOUNT" -force >/dev/null || true; fi
+  if [[ -n "$ATTACHED" ]] && mounted; then hdiutil detach "$MOUNT" -force >/dev/null || true; fi
   rm -rf "$WORK"
 }
 trap cleanup EXIT
+# Finder addresses the disk by name, so refuse to run (rather than eject) if a same-named volume is mounted.
+if mounted; then echo "A volume is already mounted at $MOUNT; eject it first." >&2; exit 1; fi
 
 mkdir -p "$STAGE/.background"
 cp -R "$APP" "$STAGE/"
@@ -35,8 +38,8 @@ tiffutil -cathidpicheck "$REPO/dmg/background.png" "$REPO/dmg/background@2x.png"
 SIZE_MB=$(( $(du -sm "$STAGE" | cut -f1) + 20 ))
 hdiutil create -volname "$VOLNAME" -srcfolder "$STAGE" -fs HFS+ -fsargs "-c c=64,a=16,e=16" \
   -format UDRW -size "${SIZE_MB}m" -ov "$RW" >/dev/null
-if mounted; then hdiutil detach "$MOUNT" -force >/dev/null; fi
 hdiutil attach -readwrite -noverify -noautoopen "$RW" >/dev/null
+ATTACHED=1
 
 osascript - "$VOLNAME" "$(basename "$APP")" "$WIN_X" "$WIN_Y" "$WIDTH" "$HEIGHT" "$ICON" "$APP_X" "$APPS_X" "$ICON_Y" <<'APPLESCRIPT'
 on run argv
@@ -87,6 +90,7 @@ sync
 for _ in 1 2 3 4 5; do [[ -f "$MOUNT/.DS_Store" ]] && break; sleep 1; done
 [[ -f "$MOUNT/.DS_Store" ]] || { echo "Finder did not write .DS_Store" >&2; exit 1; }
 hdiutil detach "$MOUNT" >/dev/null
+ATTACHED=""
 
 mkdir -p "$(dirname "$OUT")"
 rm -f "$OUT"
