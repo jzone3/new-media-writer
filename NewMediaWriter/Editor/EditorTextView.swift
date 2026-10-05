@@ -486,6 +486,10 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     }
 
     override func readSelection(from pboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
+        // A drag carrying both text and an image still reaches a card editor; append the image like the card does.
+        if !acceptsImageDrops, ImageStore.hasImages(on: pboard) {
+            setSelectedRange(NSRange(location: (string as NSString).length, length: 0))
+        }
         if insertImages(from: pboard) { return true }
         if type == .string, let s = pboard.string(forType: .string) {
             insertText(s, replacementRange: selectedRange())
