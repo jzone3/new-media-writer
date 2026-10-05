@@ -58,7 +58,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     /// Embedded in a feed card: no centred column, text spans the full frame width.
     var fillsWidth = false
     /// Feed cards show media in their own grid, so the editor skips inline image rendering.
-    var showsImages = true
+    var showsImages = true { didSet { styler.revealsBrokenImages = showsImages } }
     /// Draws a dashed "…more" fold line after this many visible (non-marker) characters.
     var foldAfterVisibleCharacters: Int? { didSet { needsDisplay = true } }
     /// Embedded editors only reveal syntax in the cursor's paragraph while they have keyboard focus.
@@ -130,6 +130,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         minSize = NSSize(width: 0, height: 0)
         maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         styler.imageHeight = { [weak self] path in self?.displayHeight(forImagePath: path) ?? 0 }
+        styler.revealsBrokenImages = showsImages
     }
 
     // MARK: - Column layout
