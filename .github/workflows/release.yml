@@ -105,30 +105,33 @@ jobs:
         run: |
           DMG="New-Media-Writer-$VERSION.dmg"
           echo "dmg=$DMG" >> "$GITHUB_ENV"
-          STAGE="$RUNNER_TEMP/dmg"
-          mkdir -p "$STAGE"
-          cp -R "$APP_NAME.app" "$STAGE/"
-          ln -s /Applications "$STAGE/Applications"
-          hdiutil create -volname "$APP_NAME" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+          # Finder-laid-out image: background, icon positions, volume icon (see scripts/build-dmg.sh).
+          scripts/build-dmg.sh "$APP_NAME.app" "$DMG"
           codesign --sign "Developer ID Application" --timestamp "$DMG"
           xcrun notarytool submit "$DMG" \
             --key "$RUNNER_TEMP/AuthKey.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
             --wait --timeout 30m
           xcrun stapler staple "$DMG"
           spctl --assess --type open --context context:primary-signature -v "$DMG"
+          # Unversioned copy so /releases/latest/download/New-Media-Writer.dmg is a stable link.
+          cp "$DMG" New-Media-Writer.dmg
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.dmg }}
+          files: |
+            ${{ env.dmg }}
+            New-Media-Writer.dmg
           generate_release_notes: true
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
           name: dmg
-          path: ${{ env.dmg }}
+          path: |
+            ${{ env.dmg }}
+            New-Media-Writer.dmg
 
       - name: Clean up keychain
         if: always()
