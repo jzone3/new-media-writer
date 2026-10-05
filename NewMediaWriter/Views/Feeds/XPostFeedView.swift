@@ -40,7 +40,7 @@ struct XPostFeedView: View {
                     ForEach(Array(thread.enumerated()), id: \.offset) { i, segment in
                         XPostCell(markdown: segment.text, baseURL: baseURL, profile: profile,
                                   isThread: thread.count > 1, isLast: i == thread.count - 1, index: i,
-                                  takesFocus: focusedNewPost == i,
+                                  takesFocus: focusedNewPost == i || (focusedNewPost == nil && i == 0),
                                   onEdit: { replace(at: i, with: $0) })
                     }
                     addToThreadRow
