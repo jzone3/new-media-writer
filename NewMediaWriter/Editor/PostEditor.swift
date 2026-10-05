@@ -23,6 +23,7 @@ struct PostEditor: NSViewRepresentable {
         let textView = EditorTextView(frame: .zero, textContainer: container)
         textView.fillsWidth = true
         textView.showsImages = false
+        textView.acceptsImageDrops = false
         textView.revealsMarkersOnlyWhenFocused = true
         textView.topInset = 0
         textView.usesFindBar = false

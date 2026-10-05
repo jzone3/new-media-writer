@@ -478,8 +478,11 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         [.fileURL, .png, .tiff, .string]
     }
 
+    /// Feed cards take image drops anywhere on the card, so their editors only accept text drags.
+    var acceptsImageDrops = true { didSet { updateDragTypeRegistration() } }
+
     override var acceptableDragTypes: [NSPasteboard.PasteboardType] {
-        [.fileURL, .png, .tiff, .string]
+        acceptsImageDrops ? [.fileURL, .png, .tiff, .string] : [.string]
     }
 
     override func readSelection(from pboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
@@ -503,21 +506,12 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     @discardableResult
     private func insertImages(from pboard: NSPasteboard) -> Bool {
-        let store = ImageStore(documentURL: documentURL)
-        var paths: [String] = []
-
-        if let urls = pboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
-            for url in urls {
-                guard let type = UTType(filenameExtension: url.pathExtension), type.conforms(to: .image) else { return false }
-                if let p = try? store.store(fileURL: url) { paths.append(p) }
-            }
-        } else if let data = pboard.data(forType: .png) {
-            if let p = try? store.store(data: data, preferredName: Self.timestampName(), ext: "png") { paths.append(p) }
-        } else if let data = pboard.data(forType: .tiff), let rep = NSBitmapImageRep(data: data), let png = rep.representation(using: .png, properties: [:]) {
-            if let p = try? store.store(data: png, preferredName: Self.timestampName(), ext: "png") { paths.append(p) }
+        guard ImageStore.hasImages(on: pboard) else { return false }
+        guard let documentURL else {
+            ImageStore.promptToSave(in: window)
+            return true
         }
-
-        guard !paths.isEmpty else { return false }
+        guard let paths = ImageStore(documentURL: documentURL).storeImages(from: pboard) else { return false }
         insertImageMarkdown(paths: paths)
         return true
     }
@@ -527,21 +521,10 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         let sel = selectedRange()
         var prefix = ""
         if sel.location > 0, string.character(at: sel.location - 1) != 10 { prefix = "\n" }
-        let lines = paths.map { path -> String in
-            let name = (path as NSString).lastPathComponent
-            let alt = ((name.removingPercentEncoding ?? name) as NSString).deletingPathExtension
-            return "![\(alt)](\(path))"
-        }
         var suffix = "\n"
         if sel.location + sel.length < string.length, string.character(at: sel.location + sel.length) == 10 { suffix = "" }
-        insertText(prefix + lines.joined(separator: "\n") + suffix, replacementRange: sel)
+        insertText(prefix + ImageStore.markdown(for: paths) + suffix, replacementRange: sel)
         onImageInserted?()
-    }
-
-    private static func timestampName() -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd-HHmmss"
-        return "image-" + f.string(from: Date())
     }
 }
 
