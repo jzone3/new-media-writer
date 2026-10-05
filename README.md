@@ -1,5 +1,7 @@
 # New Media Writer
 
+[![The notepad for New Media professionals](site/og.png)](https://newmediawriter.app/)
+
 [![Built by Devin](https://raw.githubusercontent.com/club-cog/built-by-devin/main/badges/built-by-devin.svg)](https://builtbydevin.ai)
 
 **[newmediawriter.app](https://newmediawriter.app/)** — download for Mac.

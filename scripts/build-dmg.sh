@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build a designed, compressed DMG: white background with an arrow (dmg/background*.png), app icon on the
+# Build a designed, compressed DMG: dark ASCII background with a white arrow (dmg/background*.png), app icon on the
 # left, /Applications link on the right, fixed 660x400 icon-view window, app icon as the volume icon.
 #
 # Usage: scripts/build-dmg.sh "path/to/New Media Writer.app" "out/New-Media-Writer-1.2.3.dmg"

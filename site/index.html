@@ -20,6 +20,9 @@
 <meta name="twitter:description" content="A focused Markdown editor for the Mac that previews your post on X, LinkedIn and Slack — from one file.">
 <meta name="twitter:image" content="https://www.newmediawriter.app/og.png">
 <link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pinyon+Script&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -34,8 +37,7 @@
 
 <main>
   <section class="hero">
-    <p class="eyebrow">For New Media professionals.</p>
-    <h1>Write once.<br>See it everywhere.</h1>
+    <h1 class="script"><span class="l1">The notepad for</span><span class="l2">New Media professionals</span></h1>
     <p class="lede">A focused Markdown editor for the Mac. One file, previewed exactly as it will land on X, LinkedIn and Slack — and editable right there in the feed.</p>
     <div class="cta">
       <a class="btn btn-lg" href="https://github.com/jzone3/new-media-writer/releases/latest/download/New-Media-Writer.dmg" data-download>
@@ -61,122 +63,75 @@
         </div>
 
         <div class="stage" id="stage">
-
-          <!-- Plaintext -->
-          <div class="view view-plaintext" data-view="plaintext">
-            <pre class="raw"><span class="typed" id="typed"></span><span class="caret" id="caret"></span></pre>
-          </div>
-
-          <!-- Markdown (WYSIWYG) -->
-          <div class="view view-markdown" data-view="markdown">
-            <div class="doc">
-              <h2>Shipping is a habit</h2>
-              <p>Most writers overthink the first line. <b>Write the ugly version first</b>, then cut.</p>
-              <ul><li>Say one thing</li><li>Say it plainly</li><li>Stop when it's said</li></ul>
-              <p>The feed doesn't reward <i>clever</i>. It rewards clear.</p>
-            </div>
-          </div>
-
-          <!-- X -->
-          <div class="view view-x" data-view="x">
-            <div class="x-col">
-              <div class="x-tabs"><span class="on">For you</span><span>Following</span></div>
-              <div class="ghost">
-                <span class="g-av"></span>
-                <div class="g-lines"><i style="width:120px"></i><i style="width:70px;margin-left:8px"></i><br><i style="width:100%"></i><i style="width:100%"></i><i style="width:58%"></i></div>
-              </div>
-              <article class="x-post">
-                <span class="av">TA</span>
-                <div class="x-body">
-                  <div class="x-head"><b>Test Account</b>
-                    <svg class="verified" width="16" height="16" viewBox="0 0 24 24"><path fill="#1d9bf0" d="M22.25 12c0-1.43-.88-2.67-2.19-3.34.46-1.39.2-2.9-.81-3.91s-2.52-1.27-3.91-.81c-.66-1.31-1.91-2.19-3.34-2.19s-2.67.88-3.33 2.19c-1.4-.46-2.91-.2-3.92.81s-1.26 2.52-.8 3.91c-1.31.67-2.2 1.91-2.2 3.34s.89 2.67 2.2 3.34c-.46 1.39-.21 2.9.8 3.91s2.52 1.26 3.91.81c.67 1.31 1.91 2.19 3.34 2.19s2.68-.88 3.34-2.19c1.39.45 2.9.2 3.91-.81s1.27-2.52.81-3.91c1.31-.67 2.19-1.91 2.19-3.34zm-11.71 4.2L6.8 12.46l1.41-1.42 2.26 2.26 4.8-5.23 1.47 1.36-6.2 6.77z"/></svg>
-                    <span class="dim">@testaccount · now</span></div>
-                  <div class="post-text">
-                    <p><b>Shipping is a habit</b></p>
-                    <p>Most writers overthink the first line. <b>Write the ugly version first</b>, then cut.</p>
-                    <p>• Say one thing<br>• Say it plainly<br>• Stop when it's said</p>
-                    <p>The feed doesn't reward <i>clever</i>. It rewards clear.</p>
-                  </div>
-                  <div class="x-actions">
-                    <span><svg viewBox="0 0 24 24"><path d="M1.75 10c0-4.56 3.69-8.25 8.25-8.25h4c4.56 0 8.25 3.69 8.25 8.25s-3.69 8.25-8.25 8.25H10c-.65 0-1.29-.08-1.9-.22L3.4 20.6c-.7.37-1.52-.22-1.41-1l.6-4.48A8.21 8.21 0 0 1 1.75 10z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>4</span>
-                    <span><svg viewBox="0 0 24 24"><path d="M4.5 3.88 8.88 8.5l-1.42 1.38L5.5 7.8V16c0 1.1.9 2 2 2H11v2H7.5a4 4 0 0 1-4-4V7.8L1.54 9.88.12 8.5 4.5 3.88zm15 16.24L15.12 15.5l1.42-1.38 1.96 2.08V8c0-1.1-.9-2-2-2H13V4h3.5a4 4 0 0 1 4 4v8.2l1.96-2.08 1.42 1.38-4.38 4.62z" fill="currentColor"/></svg>12</span>
-                    <span><svg viewBox="0 0 24 24"><path d="M16.7 3.6c-1.9 0-3.6 1-4.7 2.5-1.1-1.5-2.8-2.5-4.7-2.5-3.2 0-5.6 2.7-5.6 5.9 0 5.3 7.7 10.5 10.3 11.9 2.6-1.4 10.3-6.6 10.3-11.9 0-3.2-2.4-5.9-5.6-5.9z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>128</span>
-                    <span><svg viewBox="0 0 24 24"><path d="M8.75 21V3h2v18h-2zM18 21V8.5h2V21h-2zM4 21v-6h2v6H4zm9.25 0V11h2v10h-2z" fill="currentColor"/></svg>9.4K</span>
-                    <span class="r"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><svg viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4M5 13v6h14v-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                  </div>
-                </div>
-              </article>
-              <div class="ghost">
-                <span class="g-av"></span>
-                <div class="g-lines"><i style="width:110px"></i><i style="width:60px;margin-left:8px"></i><br><i style="width:100%"></i><i style="width:64%"></i></div>
+      <div class="view view-plaintext" data-view="plaintext"><pre class="raw"><span class="live" data-live="raw"></span></pre></div>
+      <div class="view view-markdown" data-view="markdown"><div class="doc live" data-live="doc"></div></div>
+      <div class="view view-x" data-view="x">
+        <div class="x-col">
+          <div class="x-tabs"><span class="on">For you</span><span>Following</span></div>
+          <div class="ghost"><span class="g-av"></span><div class="g-lines"><i style="width:120px"></i><i style="width:70px;margin-left:8px"></i><br><i style="width:100%"></i><i style="width:100%"></i><i style="width:58%"></i></div></div>
+          <article class="x-post">
+            <span class="av">TA</span>
+            <div class="x-body">
+              <div class="x-head"><b>Test Account</b>
+                <svg class="verified" width="16" height="16" viewBox="0 0 24 24"><path fill="#1d9bf0" d="M22.25 12c0-1.43-.88-2.67-2.19-3.34.46-1.39.2-2.9-.81-3.91s-2.52-1.27-3.91-.81c-.66-1.31-1.91-2.19-3.34-2.19s-2.67.88-3.33 2.19c-1.4-.46-2.91-.2-3.92.81s-1.26 2.52-.8 3.91c-1.31.67-2.2 1.91-2.2 3.34s.89 2.67 2.2 3.34c-.46 1.39-.21 2.9.8 3.91s2.52 1.26 3.91.81c.67 1.31 1.91 2.19 3.34 2.19s2.68-.88 3.34-2.19c1.39.45 2.9.2 3.91-.81s1.27-2.52.81-3.91c1.31-.67 2.19-1.91 2.19-3.34zm-11.71 4.2L6.8 12.46l1.41-1.42 2.26 2.26 4.8-5.23 1.47 1.36-6.2 6.77z"/></svg>
+                <span class="dim">@testaccount · now</span></div>
+              <div class="post-text live" data-live="post"></div>
+              <div class="x-actions">
+                <span><svg viewBox="0 0 24 24"><path d="M1.75 10c0-4.56 3.69-8.25 8.25-8.25h4c4.56 0 8.25 3.69 8.25 8.25s-3.69 8.25-8.25 8.25H10c-.65 0-1.29-.08-1.9-.22L3.4 20.6c-.7.37-1.52-.22-1.41-1l.6-4.48A8.21 8.21 0 0 1 1.75 10z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>4</span>
+                <span><svg viewBox="0 0 24 24"><path d="M4.5 3.88 8.88 8.5l-1.42 1.38L5.5 7.8V16c0 1.1.9 2 2 2H11v2H7.5a4 4 0 0 1-4-4V7.8L1.54 9.88.12 8.5 4.5 3.88zm15 16.24L15.12 15.5l1.42-1.38 1.96 2.08V8c0-1.1-.9-2-2-2H13V4h3.5a4 4 0 0 1 4 4v8.2l1.96-2.08 1.42 1.38-4.38 4.62z" fill="currentColor"/></svg>12</span>
+                <span><svg viewBox="0 0 24 24"><path d="M16.7 3.6c-1.9 0-3.6 1-4.7 2.5-1.1-1.5-2.8-2.5-4.7-2.5-3.2 0-5.6 2.7-5.6 5.9 0 5.3 7.7 10.5 10.3 11.9 2.6-1.4 10.3-6.6 10.3-11.9 0-3.2-2.4-5.9-5.6-5.9z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>1,776</span>
+                <span><svg viewBox="0 0 24 24"><path d="M8.75 21V3h2v18h-2zM18 21V8.5h2V21h-2zM4 21v-6h2v6H4zm9.25 0V11h2v10h-2z" fill="currentColor"/></svg>9.4K</span>
+                <span class="r"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><svg viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4M5 13v6h14v-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
               </div>
             </div>
-          </div>
-
-          <!-- LinkedIn -->
-          <div class="view view-li" data-view="linkedin">
-            <div class="li-col">
-              <div class="li-card li-start">
-                <div class="li-row"><span class="av">TA</span><span class="li-input">Start a post</span></div>
-                <div class="li-media"><span>Media</span><span>Video</span><span>Write article</span></div>
-              </div>
-              <div class="li-sort"><span>Sort by: <b>Top ▾</b></span></div>
-              <article class="li-card">
-                <div class="li-head">
-                  <span class="av">TA</span>
-                  <div><b>Test Account</b> <span class="dim">· You</span><div class="dim sm">Builder · Writer</div><div class="dim sm">Now · 🌐</div></div>
-                  <span class="li-dots">···&nbsp;&nbsp;✕</span>
-                </div>
-                <div class="post-text">
-                  <p><b>Shipping is a habit</b></p>
-                  <p>Most writers overthink the first line. <b>Write the ugly version first</b>, then cut.</p>
-                  <p>• Say one thing<br>• Say it plainly<br>• Stop when it's said</p>
-                  <p>The feed doesn't reward <i>clever</i>. It rewards clear.</p>
-                </div>
-                <div class="li-social"><span class="li-reacts"><i></i><i></i><i></i> 48</span><span class="dim">12 comments · 3 reposts</span></div>
-                <div class="li-actions"><span>Like</span><span>Comment</span><span>Repost</span><span>Send</span></div>
-              </article>
-              <div class="li-card ghost">
-                <span class="g-av"></span>
-                <div class="g-lines"><i style="width:140px"></i><br><i style="width:90px"></i><br><br><i style="width:100%"></i><i style="width:100%"></i><i style="width:40%"></i></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Slack -->
-          <div class="view view-slack" data-view="slack">
-            <aside class="sl-side">
-              <div class="sl-ws">Workspace ▾</div>
-              <div class="sl-nav"><span>Threads</span><span>Mentions &amp; reactions</span><span>Drafts &amp; sent</span></div>
-              <div class="sl-h">Channels</div>
-              <div class="sl-ch"><span># random</span><span># announcements</span><span># engineering</span><span class="on"># general</span><span># design</span><span># product</span></div>
-            </aside>
-            <div class="sl-main">
-              <div class="sl-top"><b># general ▾</b><span class="dim">48</span></div>
-              <div class="sl-msgs">
-                <div class="ghost"><span class="g-av sq"></span><div class="g-lines"><i style="width:100px"></i><i style="width:50px;margin-left:8px"></i><br><i style="width:100%"></i><i style="width:40%"></i></div></div>
-                <div class="ghost"><span class="g-av sq"></span><div class="g-lines"><i style="width:100px"></i><i style="width:50px;margin-left:8px"></i><br><i style="width:46%"></i></div></div>
-                <div class="sl-day"><span>Today</span></div>
-                <div class="sl-msg">
-                  <span class="av sq">TA</span>
-                  <div>
-                    <div><b>Test Account</b> <span class="dim sm">8:23 AM</span></div>
-                    <div class="post-text">
-                      <p><b>Shipping is a habit</b></p>
-                      <p>Most writers overthink the first line. <b>Write the ugly version first</b>, then cut.</p>
-                      <p>• Say one thing<br>• Say it plainly<br>• Stop when it's said</p>
-                      <p>The feed doesn't reward <i>clever</i>. It rewards clear.</p>
-                    </div>
-                    <div class="sl-reacts"><span>👍 3</span><span>🎉 1</span><span>☺</span></div>
-                  </div>
-                </div>
-              </div>
-              <div class="sl-compose"><div class="sl-tools"><b>B</b><i>I</i><s>S</s><span>⛓</span><span>≡</span><span>•≡</span><span>&lt;/&gt;</span></div><div class="dim">Message #general</div></div>
-            </div>
-          </div>
-
+          </article>
+          <div class="ghost"><span class="g-av"></span><div class="g-lines"><i style="width:110px"></i><i style="width:60px;margin-left:8px"></i><br><i style="width:100%"></i><i style="width:64%"></i></div></div>
         </div>
-
+      </div>
+      <div class="view view-li" data-view="linkedin">
+        <div class="li-col">
+          <div class="li-card li-start">
+            <div class="li-row"><span class="av">TA</span><span class="li-input">Start a post</span></div>
+            <div class="li-media"><span>Media</span><span>Video</span><span>Write article</span></div>
+          </div>
+          <div class="li-sort"><span>Sort by: <b>Top ▾</b></span></div>
+          <article class="li-card">
+            <div class="li-head">
+              <span class="av">TA</span>
+              <div><b>Test Account</b> <span class="dim">· You</span><div class="dim sm">Builder · Writer</div><div class="dim sm">Now · 🌐</div></div>
+              <span class="li-dots">···&nbsp;&nbsp;✕</span>
+            </div>
+            <div class="post-text live" data-live="post"></div>
+            <div class="li-social"><span class="li-reacts"><i></i><i></i><i></i> 56</span><span class="dim">13 comments · 1,776 reposts</span></div>
+            <div class="li-actions"><span>Like</span><span>Comment</span><span>Repost</span><span>Send</span></div>
+          </article>
+          <div class="li-card ghost"><span class="g-av"></span><div class="g-lines"><i style="width:140px"></i><br><i style="width:90px"></i><br><br><i style="width:100%"></i><i style="width:100%"></i><i style="width:40%"></i></div></div>
+        </div>
+      </div>
+      <div class="view view-slack" data-view="slack">
+        <aside class="sl-side">
+          <div class="sl-ws">Philadelphia ▾</div>
+          <div class="sl-nav"><span>Threads</span><span>Mentions &amp; reactions</span><span>Drafts &amp; sent</span></div>
+          <div class="sl-h">Channels</div>
+          <div class="sl-ch"><span># random</span><span># announcements</span><span class="on"># general</span><span># philadelphia</span><span># design</span></div>
+        </aside>
+        <div class="sl-main">
+          <div class="sl-top"><b># general ▾</b><span class="dim">56</span></div>
+          <div class="sl-msgs">
+            <div class="sl-day"><span>July 4</span></div>
+            <div class="sl-msg">
+              <span class="av sq">TA</span>
+              <div style="flex:1;min-width:0">
+                <div><b>Test Account</b> <span class="dim sm">8:23 AM</span></div>
+                <div class="post-text live" data-live="post"></div>
+                <div class="sl-reacts"><span>🦅 13</span><span>🎉 56</span><span>☺</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="sl-compose"><div class="sl-tools"><b>B</b><i>I</i><s>S</s><span>⛓</span><span>≡</span><span>•≡</span><span>&lt;/&gt;</span></div><div class="dim">Message #general</div></div>
+        </div>
+      </div>
+    </div>
         <div class="copy-pill">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3.5" y="3.5" width="6" height="7" rx="1"/><path d="M2.5 8.5v-6a1 1 0 0 1 1-1h4"/></svg>Copy
         </div>
