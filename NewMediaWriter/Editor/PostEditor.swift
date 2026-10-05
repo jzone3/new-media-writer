@@ -42,6 +42,12 @@ struct PostEditor: NSViewRepresentable {
         return textView
     }
 
+    static func dismantleNSView(_ textView: EditorTextView, coordinator: Coordinator) {
+        // Text views register undo operations with themselves as the unretained target; switching
+        // views destroys the text view, so a later ⌘Z would message a freed object.
+        coordinator.parent.undoManager?.removeAllActions(withTarget: textView)
+    }
+
     func updateNSView(_ textView: EditorTextView, context: Context) {
         context.coordinator.parent = self
         textView.documentURL = documentURL
