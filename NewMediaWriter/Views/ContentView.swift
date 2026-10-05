@@ -5,6 +5,7 @@ struct ContentView: View {
     var fileURL: URL?
     @AppStorage("viewMode") private var mode: ViewMode = .markdown
     @Environment(\.colorScheme) private var colorScheme
+    @State private var pickerShown = false
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -20,10 +21,18 @@ struct ContentView: View {
                     .padding(16)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             }
+
+            if pickerShown {
+                ViewPicker(mode: $mode, shown: $pickerShown)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .transition(.opacity)
+            }
         }
         .background(background)
         .ignoresSafeArea()
         .focusedSceneValue(\.viewMode, $mode)
+        .focusedSceneValue(\.viewPickerShown, $pickerShown)
+        .animation(.easeOut(duration: 0.12), value: pickerShown)
         .animation(.easeOut(duration: 0.15), value: mode)
     }
 
