@@ -126,7 +126,8 @@ enum MarkdownParser {
         var text: String
     }
 
-    static func thread(_ text: String) -> [ThreadSegment] {
+    /// `keepTrailingEmpty` keeps an empty post after a final `---` so the X view can show it as a composer.
+    static func thread(_ text: String, keepTrailingEmpty: Bool = false) -> [ThreadSegment] {
         let ns = text as NSString
         var raw: [NSRange] = []
         var inCode = false
@@ -146,7 +147,8 @@ enum MarkdownParser {
         let segments = raw.map {
             ThreadSegment(range: $0, text: ns.substring(with: $0).trimmingCharacters(in: .whitespacesAndNewlines))
         }
-        let nonEmpty = segments.filter { !$0.text.isEmpty }
+        var nonEmpty = segments.filter { !$0.text.isEmpty }
+        if keepTrailingEmpty, !nonEmpty.isEmpty, let last = segments.last, last.text.isEmpty { nonEmpty.append(last) }
         return nonEmpty.isEmpty ? [ThreadSegment(range: NSRange(location: 0, length: ns.length), text: "")] : nonEmpty
     }
 

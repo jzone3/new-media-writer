@@ -23,7 +23,7 @@ struct XPostFeedView: View {
     let profile: Profile
 
     private var text: String { document.text }
-    private var thread: [MarkdownParser.ThreadSegment] { MarkdownParser.thread(text) }
+    private var thread: [MarkdownParser.ThreadSegment] { MarkdownParser.thread(text, keepTrailingEmpty: true) }
     private var segments: [String] { thread.map(\.text) }
     @State private var focusedNewPost: Int?
 
@@ -37,7 +37,7 @@ struct XPostFeedView: View {
                         XPostCell(markdown: segment.text, baseURL: baseURL, profile: profile,
                                   isThread: thread.count > 1, isLast: i == thread.count - 1, index: i,
                                   takesFocus: focusedNewPost == i,
-                                  onEdit: { replace(segment, at: i, with: $0) })
+                                  onEdit: { replace(at: i, with: $0) })
                     }
                     addToThreadRow
                     ghostPost(seed: 1)
@@ -85,8 +85,12 @@ struct XPostFeedView: View {
     }
 
     /// Writes an edited post back into its slice of the document, keeping the `---` separators padded.
-    private func replace(_ segment: MarkdownParser.ThreadSegment, at index: Int, with edited: String) {
+    /// Segments are re-parsed here: keystrokes can arrive faster than SwiftUI re-renders the cards.
+    private func replace(at index: Int, with edited: String) {
         let ns = document.text as NSString
+        let thread = MarkdownParser.thread(document.text, keepTrailingEmpty: true)
+        guard index < thread.count else { return }
+        let segment = thread[index]
         guard NSMaxRange(segment.range) <= ns.length else { return }
         var replacement = edited
         if index > 0, !replacement.hasPrefix("\n") { replacement = "\n" + replacement }
