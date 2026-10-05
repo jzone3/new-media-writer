@@ -26,6 +26,7 @@ struct MarkdownEditor: NSViewRepresentable {
         let textView = EditorTextView(frame: .zero, textContainer: container)
         textView.delegate = context.coordinator
         textView.documentURL = fileURL
+        textView.takesFocusOnAppear = true
         textView.string = document.text
         context.coordinator.textView = textView
         applyMode(textView)

@@ -28,6 +28,21 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         super.viewWillMove(toWindow: newWindow)
     }
 
+    /// The document editor claims keyboard focus when it appears (new window, view switch) so typing and ⌘V
+    /// work without a click first; embedded feed-card editors leave focus alone.
+    var takesFocusOnAppear = false
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard takesFocusOnAppear, let window else { return }
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let self, let window, self.window === window else { return }
+            // Another document/card editor keeps focus; a closing ⌘K picker (field editor) does not.
+            if window.firstResponder is EditorTextView { return }
+            window.makeFirstResponder(self)
+        }
+    }
+
     override func doCommand(by selector: Selector) {
         if handleEmojiCommand(selector) { return }
         super.doCommand(by: selector)
