@@ -43,21 +43,15 @@ enum DefaultApp {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    /// Launching with nothing to open starts an Untitled document, not DocumentGroup's Open panel.
-    func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool { true }
-
-    func applicationOpenUntitledFile(_ sender: NSApplication) -> Bool {
-        NSDocumentController.shared.newDocument(nil)
-        return true
-    }
-
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // DocumentGroup opens its Open panel when launched with nothing to open (and ignores
+        // applicationShouldOpenUntitledFile). Swap that launch panel for an Untitled document; a
+        // launch with a file never shows the panel, so nothing happens then.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            // SwiftUI may still have put up its Open panel; swap it for an Untitled document.
-            if NSDocumentController.shared.documents.isEmpty {
-                NSApp.windows.compactMap { $0 as? NSOpenPanel }.forEach { $0.cancel(nil) }
-                NSDocumentController.shared.newDocument(nil)
-            }
+            guard NSDocumentController.shared.documents.isEmpty,
+                  let panel = NSApp.windows.first(where: { $0 is NSOpenPanel }) as? NSOpenPanel else { return }
+            panel.cancel(nil)
+            NSDocumentController.shared.newDocument(nil)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             DefaultApp.promptIfNeeded()
