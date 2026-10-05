@@ -15,7 +15,9 @@ extension EditorTextView {
         let url = clip.hasPrefix("http://") || clip.hasPrefix("https://") ? clip : ""
         let text = "[\(selected)](\(url))"
         guard shouldChangeText(in: sel, replacementString: text) else { return }
+        breakUndoCoalescing()
         insertText(text, replacementRange: sel)
+        breakUndoCoalescing()
         // Caret goes to whichever slot is still empty: the label, else the URL.
         let caret = selected.isEmpty ? sel.location + 1 : sel.location + (selected as NSString).length + 3 + (url as NSString).length
         setSelectedRange(NSRange(location: caret, length: 0))
@@ -79,7 +81,9 @@ extension EditorTextView {
         }
         let newText = out.joined(separator: "\n") + (trailingNewline ? "\n" : "")
         guard newText != text, shouldChangeText(in: range, replacementString: newText) else { return }
+        breakUndoCoalescing()
         insertText(newText, replacementRange: range)
+        breakUndoCoalescing()
         if sel.length == 0, lines.count == 1 {
             let delta = (newText as NSString).length - (text as NSString).length
             setSelectedRange(NSRange(location: max(range.location, sel.location + delta), length: 0))
@@ -97,7 +101,9 @@ extension EditorTextView {
 
         func replace(_ range: NSRange, with text: String, select: NSRange) {
             guard shouldChangeText(in: range, replacementString: text) else { return }
+            breakUndoCoalescing()
             insertText(text, replacementRange: range)
+            breakUndoCoalescing()
             setSelectedRange(select)
         }
 
