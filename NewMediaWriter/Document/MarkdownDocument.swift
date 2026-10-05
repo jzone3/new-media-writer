@@ -27,10 +27,17 @@ final class MarkdownDocument: ReferenceFileDocument, ObservableObject {
     static func decode(_ data: Data) -> String {
         var bytes = data
         if bytes.starts(with: [0xEF, 0xBB, 0xBF]) { bytes = bytes.dropFirst(3) }
-        for encoding in [String.Encoding.utf8, .windowsCP1252, .isoLatin1] {
-            if let string = String(data: bytes, encoding: encoding) { return string }
-        }
-        return String(decoding: bytes, as: UTF8.self)
+        if let utf8 = String(data: bytes, encoding: .utf8) { return utf8 }
+        // Mostly valid UTF-8 with a few bad bytes stays UTF-8 (bad bytes become U+FFFD) rather than
+        // turning every multibyte character into mojibake; only text whose high bytes are mostly
+        // invalid as UTF-8 is treated as legacy single-byte Latin text.
+        let lossy = String(decoding: bytes, as: UTF8.self)
+        let replacements = lossy.unicodeScalars.filter { $0 == "\u{FFFD}" }.count
+        let highBytes = bytes.filter { $0 >= 0x80 }.count
+        if replacements * 2 <= highBytes { return lossy }
+        return String(data: bytes, encoding: .windowsCP1252)
+            ?? String(data: bytes, encoding: .isoLatin1)
+            ?? lossy
     }
 
     func snapshot(contentType: UTType) throws -> String { text }
