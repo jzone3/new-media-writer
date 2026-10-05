@@ -1,9 +1,11 @@
 name: Release
 
 # Push a tag like v0.2.0 to build, sign (Developer ID), notarize and publish a DMG.
+# Pushing any `release-dry-run/**` branch runs the same pipeline but only uploads the DMG as an artifact.
 on:
   push:
     tags: ["v*"]
+    branches: ["release-dry-run/**"]
   workflow_dispatch:
 
 permissions:
