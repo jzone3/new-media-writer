@@ -32,10 +32,11 @@ Or open `NewMediaWriter.xcodeproj` in Xcode and run.
 
 ## Releasing
 
-Pushing a tag like `v0.2.0` runs `.github/workflows/release.yml`, which builds a Release archive signed with a
-Developer ID certificate (hardened runtime), notarizes it, wraps it in a DMG, notarizes and staples the DMG and
-attaches it to a GitHub Release. The tag (minus `v`) becomes the app version. Pushing a `release-dry-run/**`
-branch runs the same signing + notarization and uploads the DMG as a workflow artifact without publishing a Release.
+Every push to `master` runs `.github/workflows/release.yml`, which tags the next patch version (`v0.1.2`, `v0.1.3`, …),
+builds a Release archive signed with a Developer ID certificate, notarizes it, wraps it in a DMG and attaches it to a
+GitHub Release — so `/releases/latest/download/New-Media-Writer.dmg` always serves master. Pushing a tag like `v0.2.0`
+by hand releases that explicit version. Pushing a `release-dry-run/**` branch runs the same signing + notarization and
+uploads the DMG as a workflow artifact without publishing a Release.
 
 Repository secrets it expects:
 

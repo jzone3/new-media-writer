@@ -1,12 +1,19 @@
 name: Release
 
-# Push a tag like v0.2.0 to build, sign (Developer ID), notarize and publish a DMG.
-# Pushing any `release-dry-run/**` branch runs the same pipeline but only uploads the DMG as an artifact.
+# Every push to master auto-tags the next patch version (v0.1.2, v0.1.3, …), builds, signs (Developer ID),
+# notarizes and publishes the DMG, so /releases/latest always serves master. Pushing a tag like v0.2.0 by hand
+# does the same for an explicit version. Pushing any `release-dry-run/**` branch runs the pipeline but only
+# uploads the DMG as an artifact.
 on:
   push:
+    branches: ["master", "release-dry-run/**"]
     tags: ["v*"]
-    branches: ["release-dry-run/**"]
   workflow_dispatch:
+
+# One release at a time, in order — two master pushes in flight must not both compute the same next tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -24,24 +31,38 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # tags are needed to compute the next version
 
       - run: brew install xcodegen
       - run: xcodegen generate
 
-      - name: Version from tag
+      - name: Version
         id: version
         run: |
+          SEMVER='^[0-9]+\.[0-9]+\.[0-9]+$'
+          PUBLISH=false
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             VERSION="${GITHUB_REF#refs/tags/v}"
             # CFBundleShortVersionString must be dotted integers; also keeps the tag from reaching a shell unescaped.
-            if [[ ! "$VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+            if [[ ! "$VERSION" =~ $SEMVER ]]; then
               echo "Tag v$VERSION is not a valid version (expected vMAJOR.MINOR.PATCH)" >&2
               exit 1
             fi
+            PUBLISH=true
+          elif [[ "$GITHUB_REF" == refs/heads/master ]]; then
+            # Next patch after the highest existing vX.Y.Z tag; the tag itself is created at publish time.
+            LATEST="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sed 's/^v//' | { grep -E "$SEMVER" || true; } | sort -V | tail -1)"
+            LATEST="${LATEST:-0.0.0}"
+            IFS=. read -r MAJOR MINOR PATCH <<< "$LATEST"
+            VERSION="$((10#$MAJOR)).$((10#$MINOR)).$((10#$PATCH + 1))"
+            PUBLISH=true
           else
             VERSION="0.0.$GITHUB_RUN_NUMBER"
           fi
           echo "marketing=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
+          echo "Version $VERSION (publish=$PUBLISH)"
 
       - name: Import Developer ID certificate
         env:
@@ -117,9 +138,11 @@ jobs:
           cp "$DMG" New-Media-Writer.dmg
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.version.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.version.outputs.marketing }}
+          target_commitish: ${{ github.sha }}   # tag the commit that was built, even if master moved on
           files: |
             ${{ env.dmg }}
             New-Media-Writer.dmg
