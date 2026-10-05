@@ -209,6 +209,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         guard clamped.length > 0 else { return }
         layoutManager.invalidateGlyphs(forCharacterRange: clamped, changeInLength: 0, actualCharacterRange: nil)
         layoutManager.invalidateLayout(forCharacterRange: clamped, actualCharacterRange: nil)
+        layoutManager.invalidateDisplay(forCharacterRange: clamped)
     }
 
     private func invalidateAllGlyphs() {

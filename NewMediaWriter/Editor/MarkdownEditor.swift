@@ -52,6 +52,7 @@ struct MarkdownEditor: NSViewRepresentable {
     }
 
     private func applyMode(_ textView: EditorTextView) {
+        textView.emojiPopup.hide()
         textView.styler.raw = raw
         textView.styler.theme = raw ? .raw : .wysiwyg
         textView.hideMarkers = !raw

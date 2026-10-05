@@ -202,9 +202,11 @@ final class MarkdownStyler {
 
         if let img = MarkdownParser.standaloneImage(trimmed) {
             apply(storage, range, font: theme.mono.withSize(12), color: theme.secondary)
-            hiddenLine(storage, range)
-            storage.addAttribute(.mdImage, value: img.path, range: range)
             let h = imageHeight(img.path)
+            // A local file that failed to load keeps its source line visible instead of vanishing silently.
+            let isRemote = img.path.hasPrefix("http://") || img.path.hasPrefix("https://")
+            if h > 0 || isRemote { hiddenLine(storage, range) }
+            storage.addAttribute(.mdImage, value: img.path, range: range)
             paragraph(storage, range) { p in
                 p.paragraphSpacing = h + 16
                 p.lineHeightMultiple = 1.2
@@ -217,7 +219,10 @@ final class MarkdownStyler {
             if trimmed.count > 1, trimmed[trimmed.index(after: trimmed.startIndex)] == " " { markerLen = 2 }
             marker(storage, NSRange(location: range.location + leading, length: min(markerLen, range.length - leading)))
             storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: range)
-            storage.addAttribute(.mdQuote, value: true, range: range)
+            // Starts after the (hidden) marker: a zero-width glyph at the paragraph start is laid out on the
+            // previous line, which drags the quote bar one line up.
+            let markerEnd = min(range.location + leading + markerLen, NSMaxRange(range))
+            storage.addAttribute(.mdQuote, value: true, range: NSRange(location: markerEnd, length: NSMaxRange(range) - markerEnd))
             paragraph(storage, range) { p in
                 p.headIndent = 22
                 p.firstLineHeadIndent = 22
