@@ -15,6 +15,7 @@ struct NewMediaWriterApp: App {
         .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .defaultSize(width: 980, height: 760)
         .commands {
+            UpdateCommands()
             ViewCommands()
         }
 
