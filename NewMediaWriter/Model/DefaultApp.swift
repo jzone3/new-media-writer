@@ -2,7 +2,8 @@ import AppKit
 import UniformTypeIdentifiers
 
 enum DefaultApp {
-    static let promptedKey = "defaultAppPrompted"
+    // Bumped when the prompt was unreachable in shipped builds (hidden behind the launch Open panel), so those users get asked once.
+    static let promptedKey = "defaultAppPrompted.2"
     static let markdown = UTType(importedAs: "net.daringfireball.markdown", conformingTo: .plainText)
 
     /// True when running from a mounted disk image or an App Translocation
@@ -42,8 +43,23 @@ enum DefaultApp {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Launching with nothing to open starts an Untitled document, not DocumentGroup's Open panel.
+    func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool { true }
+
+    func applicationOpenUntitledFile(_ sender: NSApplication) -> Bool {
+        NSDocumentController.shared.newDocument(nil)
+        return true
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // SwiftUI may still have put up its Open panel; swap it for an Untitled document.
+            if NSDocumentController.shared.documents.isEmpty {
+                NSApp.windows.compactMap { $0 as? NSOpenPanel }.forEach { $0.cancel(nil) }
+                NSDocumentController.shared.newDocument(nil)
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             DefaultApp.promptIfNeeded()
         }
     }

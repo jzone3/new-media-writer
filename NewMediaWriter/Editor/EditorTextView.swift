@@ -36,9 +36,8 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         super.viewDidMoveToWindow()
         guard takesFocusOnAppear, let window else { return }
         DispatchQueue.main.async { [weak self, weak window] in
-            guard let self, let window, self.window === window else { return }
-            // Another document/card editor keeps focus; a closing ⌘K picker (field editor) does not.
-            if window.firstResponder is EditorTextView { return }
+            // The outgoing view's card editor (or the closing ⌘K picker) may still hold focus here; take it anyway.
+            guard let self, let window, self.window === window, window.firstResponder !== self else { return }
             window.makeFirstResponder(self)
         }
     }
