@@ -52,6 +52,13 @@ struct ViewCommands: Commands {
     @FocusedValue(\.viewMode) private var viewMode
     @FocusedValue(\.viewPickerShown) private var viewPickerShown
 
+    private func step(_ delta: Int) {
+        guard let viewMode else { return }
+        let all = ViewMode.allCases
+        let i = all.firstIndex(of: viewMode.wrappedValue) ?? 0
+        viewMode.wrappedValue = all[(i + delta + all.count) % all.count]
+    }
+
     var body: some Commands {
         CommandGroup(after: .sidebar) {
             Divider()
@@ -63,6 +70,12 @@ struct ViewCommands: Commands {
             Button("Switch View…") { viewPickerShown?.wrappedValue.toggle() }
                 .keyboardShortcut("k", modifiers: .command)
                 .disabled(viewPickerShown == nil)
+            Button("Previous View") { step(-1) }
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+                .disabled(viewMode == nil)
+            Button("Next View") { step(1) }
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+                .disabled(viewMode == nil)
         }
         CommandGroup(replacing: .textFormatting) {
             Button("Bold") { send(Selector(("toggleBoldface:"))) }.keyboardShortcut("b", modifiers: .command)

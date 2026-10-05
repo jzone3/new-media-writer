@@ -2,6 +2,8 @@
 
 [![Built by Devin](https://raw.githubusercontent.com/club-cog/built-by-devin/main/badges/built-by-devin.svg)](https://builtbydevin.ai)
 
+**[newmediawriter.app](https://newmediawriter.app/)** — download for Mac.
+
 A minimalist, focus-first Markdown writing app for macOS. Write once in Markdown, then preview the same file as it would appear in the feed:
 
 - **Plaintext** — the raw Markdown source.
@@ -58,7 +60,9 @@ from Xcode.
 | Slack | ⌘5 |
 | Copy for current view | ⇧⌘C |
 | Bold / Italic / Inline code (toggle `**` / `*` / `` ` `` around the selection) | ⌘B / ⌘I / ⌘E |
-| Insert link (uses a URL from the clipboard if there is one) | ⌘K |
+| Switch view by typing its name (e.g. "sl" → Slack) | ⌘K |
+| Previous / next view | ⌥⌘← / ⌥⌘→ |
+| Insert link (uses a URL from the clipboard if there is one) | ⇧⌘K |
 | Bulleted / numbered list (Enter continues a list, Enter on an empty item ends it) | ⌥⌘U / ⌥⌘O |
 
 Set your name, handle, headline, avatar and Slack channel in **Settings (⌘,)** so previews look like you.
