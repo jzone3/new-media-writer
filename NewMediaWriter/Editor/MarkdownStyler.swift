@@ -3,6 +3,8 @@ import AppKit
 extension NSAttributedString.Key {
     /// Syntax characters (`**`, `#`, `>` …) that are hidden unless the cursor is in the paragraph.
     static let mdMarker = NSAttributedString.Key("mdMarker")
+    /// The `-` / `*` / `+` of an unordered list item; drawn as a bullet glyph.
+    static let mdBullet = NSAttributedString.Key("mdBullet")
     /// Set on a standalone image paragraph; value is the markdown path string.
     static let mdImage = NSAttributedString.Key("mdImage")
     static let mdCodeBackground = NSAttributedString.Key("mdCodeBackground")
@@ -228,7 +230,10 @@ final class MarkdownStyler {
         if let item = MarkdownParser.listItem(trimmed) {
             let prefixLen = trimmed.count - item.content.count
             let markerRange = NSRange(location: range.location + leading, length: min(prefixLen, range.length - leading))
-            storage.addAttribute(.foregroundColor, value: theme.accent, range: markerRange)
+            storage.addAttribute(.foregroundColor, value: item.ordered ? theme.accent : theme.text, range: markerRange)
+            if !item.ordered, !raw, markerRange.length > 0 {
+                storage.addAttribute(.mdBullet, value: true, range: NSRange(location: markerRange.location, length: 1))
+            }
             let indent = CGFloat(leading) * 10
             paragraph(storage, range) { p in
                 p.firstLineHeadIndent = indent

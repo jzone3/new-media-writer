@@ -57,6 +57,9 @@ struct ViewCommands: Commands {
             Button("Italic") { send(Selector(("toggleItalics:"))) }.keyboardShortcut("i", modifiers: .command)
             Button("Inline Code") { send(#selector(EditorTextView.toggleInlineCode(_:))) }.keyboardShortcut("e", modifiers: .command)
             Button("Link") { send(#selector(EditorTextView.insertLink(_:))) }.keyboardShortcut("k", modifiers: .command)
+            Divider()
+            Button("Bulleted List") { send(#selector(EditorTextView.toggleBulletedList(_:))) }.keyboardShortcut("u", modifiers: [.command, .option])
+            Button("Numbered List") { send(#selector(EditorTextView.toggleNumberedList(_:))) }.keyboardShortcut("o", modifiers: [.command, .option])
         }
         CommandGroup(after: .pasteboard) {
             Button("Copy for Current View") {

@@ -21,6 +21,73 @@ extension EditorTextView {
         setSelectedRange(NSRange(location: caret, length: 0))
     }
 
+    @objc func toggleBulletedList(_ sender: Any?) { toggleList(ordered: false) }
+    @objc func toggleNumberedList(_ sender: Any?) { toggleList(ordered: true) }
+
+    /// Enter inside a list item starts the next item; Enter on an empty item ends the list.
+    override func insertNewline(_ sender: Any?) {
+        let ns = string as NSString
+        let sel = selectedRange()
+        guard sel.length == 0 else { super.insertNewline(sender); return }
+        let para = ns.paragraphRange(for: sel)
+        let line = ns.substring(with: para).trimmingCharacters(in: .newlines)
+        let leading = String(line.prefix { $0 == " " || $0 == "\t" })
+        let rest = String(line.dropFirst(leading.count))
+        guard let item = MarkdownParser.listItem(rest) else { super.insertNewline(sender); return }
+        let prefix = String(rest.prefix(rest.count - item.content.count))
+        let contentStart = para.location + (leading as NSString).length + (prefix as NSString).length
+        guard sel.location >= contentStart else { super.insertNewline(sender); return }
+
+        if item.content.trimmingCharacters(in: .whitespaces).isEmpty {
+            let markerRange = NSRange(location: para.location, length: contentStart - para.location)
+            guard shouldChangeText(in: markerRange, replacementString: "") else { return }
+            insertText("", replacementRange: markerRange)
+            return
+        }
+
+        var next = prefix
+        if item.ordered, let n = Int(prefix.prefix { $0.isNumber }) {
+            next = "\(n + 1)" + prefix.drop { $0.isNumber }
+        }
+        let insert = "\n" + leading + next
+        guard shouldChangeText(in: sel, replacementString: insert) else { return }
+        insertText(insert, replacementRange: sel)
+    }
+
+    /// Adds `- ` / `1. ` to every paragraph in the selection, or strips the markers when they are all already items.
+    private func toggleList(ordered: Bool) {
+        let ns = string as NSString
+        let sel = selectedRange()
+        let range = ns.paragraphRange(for: sel)
+        let text = ns.substring(with: range)
+        let trailingNewline = text.hasSuffix("\n")
+        var lines = text.components(separatedBy: "\n")
+        if trailingNewline { lines.removeLast() }
+        let content = lines.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        let allItems = !content.isEmpty && content.allSatisfy {
+            MarkdownParser.listItem($0.trimmingCharacters(in: .whitespaces))?.ordered == ordered
+        }
+        var n = 1
+        let out = lines.map { line -> String in
+            let leading = String(line.prefix { $0 == " " || $0 == "\t" })
+            let rest = String(line.dropFirst(leading.count))
+            if rest.isEmpty { return line }
+            let body = MarkdownParser.listItem(rest)?.content ?? rest
+            if allItems { return leading + body }
+            defer { n += 1 }
+            return leading + (ordered ? "\(n). " : "- ") + body
+        }
+        let newText = out.joined(separator: "\n") + (trailingNewline ? "\n" : "")
+        guard newText != text, shouldChangeText(in: range, replacementString: newText) else { return }
+        insertText(newText, replacementRange: range)
+        if sel.length == 0, lines.count == 1 {
+            let delta = (newText as NSString).length - (text as NSString).length
+            setSelectedRange(NSRange(location: max(range.location, sel.location + delta), length: 0))
+        } else {
+            setSelectedRange(NSRange(location: range.location, length: (newText as NSString).length - (trailingNewline ? 1 : 0)))
+        }
+    }
+
     /// Wraps the selection in `marker`, or unwraps it when the markers are already there
     /// (inside or immediately around the selection). With no selection, inserts an empty pair.
     private func toggleMarker(_ marker: String) {

@@ -173,10 +173,17 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     func layoutManager(_ layoutManager: NSLayoutManager, shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>, properties props: UnsafePointer<NSLayoutManager.GlyphProperty>, characterIndexes charIndexes: UnsafePointer<Int>, font aFont: NSFont, forGlyphRange glyphRange: NSRange) -> Int {
         guard hideMarkers, let storage = layoutManager.textStorage else { return 0 }
         var newProps = Array(UnsafeBufferPointer(start: props, count: glyphRange.length))
+        var newGlyphs = Array(UnsafeBufferPointer(start: glyphs, count: glyphRange.length))
         var changed = false
         for i in 0..<glyphRange.length {
             let charIndex = charIndexes[i]
             guard charIndex < storage.length else { continue }
+            if storage.attribute(.mdBullet, at: charIndex, effectiveRange: nil) != nil,
+               let bullet = Self.bulletGlyph(in: aFont) {
+                newGlyphs[i] = bullet
+                changed = true
+                continue
+            }
             if revealsActiveParagraph, NSLocationInRange(charIndex, activeParagraph) { continue }
             if storage.attribute(.mdMarker, at: charIndex, effectiveRange: nil) != nil {
                 newProps[i] = storage.attribute(.mdKeepLine, at: charIndex, effectiveRange: nil) != nil ? .controlCharacter : .null
@@ -184,10 +191,22 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
             }
         }
         guard changed else { return 0 }
-        newProps.withUnsafeBufferPointer { buf in
-            layoutManager.setGlyphs(glyphs, properties: buf.baseAddress!, characterIndexes: charIndexes, font: aFont, forGlyphRange: glyphRange)
+        newProps.withUnsafeBufferPointer { propBuf in
+            newGlyphs.withUnsafeBufferPointer { glyphBuf in
+                layoutManager.setGlyphs(glyphBuf.baseAddress!, properties: propBuf.baseAddress!, characterIndexes: charIndexes, font: aFont, forGlyphRange: glyphRange)
+            }
         }
         return glyphRange.length
+    }
+
+    private static var bulletGlyphCache: [NSFont: CGGlyph] = [:]
+    private static func bulletGlyph(in font: NSFont) -> CGGlyph? {
+        if let cached = bulletGlyphCache[font] { return cached == 0 ? nil : cached }
+        var chars: [UniChar] = [0x2022]
+        var glyph: [CGGlyph] = [0]
+        CTFontGetGlyphsForCharacters(font, &chars, &glyph, 1)
+        bulletGlyphCache[font] = glyph[0]
+        return glyph[0] == 0 ? nil : glyph[0]
     }
 
     func layoutManager(_ layoutManager: NSLayoutManager, shouldUse action: NSLayoutManager.ControlCharacterAction, forControlCharacterAt charIndex: Int) -> NSLayoutManager.ControlCharacterAction {
