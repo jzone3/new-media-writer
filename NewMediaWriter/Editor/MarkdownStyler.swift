@@ -78,6 +78,8 @@ final class MarkdownStyler {
     var raw = false
     /// Returns the display height for an image path given the current column width.
     var imageHeight: (String) -> CGFloat = { _ in 0 }
+    /// Document editor only: a local image that fails to load keeps its source line visible.
+    var revealsBrokenImages = false
 
     private static let inlineCode = try! NSRegularExpression(pattern: "`([^`\\n]+)`")
     private static let bold = try! NSRegularExpression(pattern: "(\\*\\*|__)(?=\\S)(.+?)(?<=\\S)\\1")
@@ -202,9 +204,11 @@ final class MarkdownStyler {
 
         if let img = MarkdownParser.standaloneImage(trimmed) {
             apply(storage, range, font: theme.mono.withSize(12), color: theme.secondary)
-            hiddenLine(storage, range)
-            storage.addAttribute(.mdImage, value: img.path, range: range)
             let h = imageHeight(img.path)
+            // A local file that failed to load keeps its source line visible instead of vanishing silently.
+            let isRemote = img.path.hasPrefix("http://") || img.path.hasPrefix("https://")
+            if h > 0 || isRemote || !revealsBrokenImages { hiddenLine(storage, range) }
+            storage.addAttribute(.mdImage, value: img.path, range: range)
             paragraph(storage, range) { p in
                 p.paragraphSpacing = h + 16
                 p.lineHeightMultiple = 1.2
@@ -217,7 +221,14 @@ final class MarkdownStyler {
             if trimmed.count > 1, trimmed[trimmed.index(after: trimmed.startIndex)] == " " { markerLen = 2 }
             marker(storage, NSRange(location: range.location + leading, length: min(markerLen, range.length - leading)))
             storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: range)
-            storage.addAttribute(.mdQuote, value: true, range: range)
+            // Starts after the (hidden) marker: a zero-width glyph at the paragraph start is laid out on the
+            // previous line, which drags the quote bar one line up.
+            // An empty `>` line has nothing after the marker, so the bar is hung on its newline instead.
+            let markerEnd = min(range.location + leading + markerLen, NSMaxRange(range))
+            let quoteLength = min(max(NSMaxRange(range) - markerEnd, 1), storage.length - markerEnd)
+            if quoteLength > 0 {
+                storage.addAttribute(.mdQuote, value: true, range: NSRange(location: markerEnd, length: quoteLength))
+            }
             paragraph(storage, range) { p in
                 p.headIndent = 22
                 p.firstLineHeadIndent = 22

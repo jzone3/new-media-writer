@@ -65,7 +65,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     /// Embedded in a feed card: no centred column, text spans the full frame width.
     var fillsWidth = false
     /// Feed cards show media in their own grid, so the editor skips inline image rendering.
-    var showsImages = true
+    var showsImages = true { didSet { styler.revealsBrokenImages = showsImages } }
     /// Draws a dashed fold line + label after this many visible (non-marker) characters.
     var foldAfterVisibleCharacters: Int? { didSet { if oldValue != foldAfterVisibleCharacters { relayoutFold() } } }
     var foldStyle = FoldMarkerStyle() { didSet { if oldValue.label != foldStyle.label { relayoutFold() } else { needsDisplay = true } } }
@@ -138,6 +138,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         minSize = NSSize(width: 0, height: 0)
         maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         styler.imageHeight = { [weak self] path in self?.displayHeight(forImagePath: path) ?? 0 }
+        styler.revealsBrokenImages = showsImages
     }
 
     // MARK: - Column layout
@@ -217,6 +218,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         guard clamped.length > 0 else { return }
         layoutManager.invalidateGlyphs(forCharacterRange: clamped, changeInLength: 0, actualCharacterRange: nil)
         layoutManager.invalidateLayout(forCharacterRange: clamped, actualCharacterRange: nil)
+        layoutManager.invalidateDisplay(forCharacterRange: clamped)
     }
 
     private func invalidateAllGlyphs() {
