@@ -17,6 +17,7 @@ final class EmojiPopup {
         return p
     }()
     private lazy var host = NSHostingView(rootView: list)
+    private var clickMonitor: Any?
 
     var isVisible: Bool { panel.isVisible }
 
@@ -38,9 +39,17 @@ final class EmojiPopup {
         panel.setFrame(NSRect(origin: origin, size: size), display: true)
         if panel.parent == nil { parent.addChildWindow(panel, ordered: .above) }
         panel.orderFront(nil)
+        // Clicks on chrome that doesn't take focus (feed background, scroll) leave the caret put, so watch for them here.
+        if clickMonitor == nil {
+            clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .scrollWheel]) { [weak self] event in
+                if let self, event.window !== self.panel { self.hide() }
+                return event
+            }
+        }
     }
 
     func hide() {
+        if let clickMonitor { NSEvent.removeMonitor(clickMonitor); self.clickMonitor = nil }
         guard panel.isVisible || panel.parent != nil else { return }
         panel.parent?.removeChildWindow(panel)
         panel.orderOut(nil)
