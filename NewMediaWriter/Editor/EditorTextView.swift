@@ -119,13 +119,12 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     // MARK: - Styling pipeline
 
-    func textStorage(_ textStorage: NSTextStorage, willProcessEditing editedMask: NSTextStorageEditActions, range editedRange: NSRange, changeInLength delta: Int) {
-        guard editedMask.contains(.editedCharacters) else { return }
-        styler.restyle(textStorage)
-    }
-
+    // Restyling happens here, after the edit has been processed, as an attribute-only pass. Doing it inside
+    // `willProcessEditing` widened the character-edit range to the whole document, which made NSTextView
+    // move the insertion point to the end of the text after every keystroke.
     override func didChangeText() {
         super.didChangeText()
+        if let textStorage { styler.restyle(textStorage) }
         updateActiveParagraph(invalidate: true)
         if foldAfterVisibleCharacters != nil { needsDisplay = true }
         needsImageLayout = true
