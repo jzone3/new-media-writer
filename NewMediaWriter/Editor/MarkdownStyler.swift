@@ -20,6 +20,8 @@ struct EditorTheme {
     var accent: NSColor
     var codeBackground: NSColor
     var lineHeightMultiple: CGFloat
+    var paragraphSpacing: CGFloat = 10
+    var headingFontOverride: ((Int) -> NSFont)? = nil
 
     static let wysiwyg = EditorTheme(
         body: .systemFont(ofSize: 17, weight: .regular),
@@ -41,12 +43,29 @@ struct EditorTheme {
         lineHeightMultiple: 1.5
     )
 
+    /// Compact theme for post bodies embedded in feed cards: platform font size, flat headings.
+    static func post(size: CGFloat, text: NSColor, secondary: NSColor, accent: NSColor, codeBackground: NSColor,
+                     lineHeightMultiple: CGFloat = 1.3) -> EditorTheme {
+        EditorTheme(
+            body: .systemFont(ofSize: size),
+            mono: .monospacedSystemFont(ofSize: size - 1.5, weight: .regular),
+            text: text,
+            secondary: secondary,
+            accent: accent,
+            codeBackground: codeBackground,
+            lineHeightMultiple: lineHeightMultiple,
+            paragraphSpacing: 8,
+            headingFontOverride: { _ in .systemFont(ofSize: size, weight: .bold) }
+        )
+    }
+
     func headingFont(level: Int) -> NSFont {
+        if let headingFontOverride { return headingFontOverride(level) }
         switch level {
-        case 1: .systemFont(ofSize: 32, weight: .bold)
-        case 2: .systemFont(ofSize: 25, weight: .bold)
-        case 3: .systemFont(ofSize: 20, weight: .semibold)
-        default: .systemFont(ofSize: 17, weight: .semibold)
+        case 1: return .systemFont(ofSize: 32, weight: .bold)
+        case 2: return .systemFont(ofSize: 25, weight: .bold)
+        case 3: return .systemFont(ofSize: 20, weight: .semibold)
+        default: return .systemFont(ofSize: 17, weight: .semibold)
         }
     }
 }
@@ -75,7 +94,7 @@ final class MarkdownStyler {
 
         let base = NSMutableParagraphStyle()
         base.lineHeightMultiple = theme.lineHeightMultiple
-        base.paragraphSpacing = raw ? 0 : 10
+        base.paragraphSpacing = raw ? 0 : theme.paragraphSpacing
         storage.setAttributes([
             .font: theme.body,
             .foregroundColor: theme.text,
@@ -155,10 +174,11 @@ final class MarkdownStyler {
             apply(storage, range, font: font, color: theme.text)
             let markerLen = level + 1
             marker(storage, NSRange(location: range.location + leading, length: min(markerLen, range.length - leading)))
+            let flat = theme.headingFontOverride != nil
             paragraph(storage, range) { p in
-                p.lineHeightMultiple = 1.2
-                p.paragraphSpacingBefore = level == 1 ? 14 : 10
-                p.paragraphSpacing = 6
+                p.lineHeightMultiple = flat ? self.theme.lineHeightMultiple : 1.2
+                p.paragraphSpacingBefore = flat ? 0 : (level == 1 ? 14 : 10)
+                p.paragraphSpacing = flat ? self.theme.paragraphSpacing : 6
             }
             inline(storage, range)
             return

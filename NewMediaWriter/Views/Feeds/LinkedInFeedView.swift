@@ -10,13 +10,23 @@ enum LinkedInTheme {
     /// Desktop feed truncates after roughly this many characters with "…more".
     static let fold = 210
     static let columnWidth: CGFloat = 555
+
+    static let editorTheme = EditorTheme.post(
+        size: 14,
+        text: .adaptive(light: 0x191919, dark: 0xE9E5DF),
+        secondary: .adaptive(light: 0x666666, dark: 0xB0B0B0),
+        accent: NSColor(blue),
+        codeBackground: NSColor.labelColor.withAlphaComponent(0.055),
+        lineHeightMultiple: 1.35
+    )
 }
 
 struct LinkedInFeedView: View {
-    let text: String
+    @ObservedObject var document: MarkdownDocument
     let baseURL: URL?
     let profile: Profile
 
+    private var text: String { document.text }
     private var plain: String { MarkdownRender.plainText(text) }
     private var images: [URL?] {
         MarkdownParser.images(in: text).map { ImagePathResolver.resolve($0.path, relativeTo: baseURL) }
@@ -28,7 +38,8 @@ struct LinkedInFeedView: View {
                 VStack(spacing: 8) {
                     composer
                     sortRow
-                    LinkedInPostCard(plain: plain, images: images, profile: profile)
+                    LinkedInPostCard(markdown: text, images: images, profile: profile, baseURL: baseURL,
+                                     onEdit: { document.text = $0 })
                     ghostPost(seed: 1, hasImage: false)
                     ghostPost(seed: 2, hasImage: true)
                 }
@@ -117,21 +128,26 @@ struct LinkedInFeedView: View {
 }
 
 struct LinkedInPostCard: View {
-    let plain: String
+    let markdown: String
     let images: [URL?]
     let profile: Profile
+    var baseURL: URL? = nil
+    var onEdit: (String) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header.padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 8)
 
-            if plain.isEmpty && images.isEmpty {
-                Text("What do you want to talk about?")
-                    .font(.system(size: 14)).foregroundStyle(LinkedInTheme.secondary)
-                    .padding(.horizontal, 16).padding(.bottom, 12)
-            } else {
-                postText.padding(.horizontal, 16).padding(.bottom, 12)
-            }
+            PostEditor(text: markdown, theme: LinkedInTheme.editorTheme, documentURL: baseURL,
+                       foldAfter: LinkedInTheme.fold, onChange: onEdit)
+                .overlay(alignment: .topLeading) {
+                    if markdown.isEmpty {
+                        Text("What do you want to talk about?")
+                            .font(.system(size: 14)).foregroundStyle(LinkedInTheme.secondary)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .padding(.horizontal, 16).padding(.bottom, 12)
 
             if !images.isEmpty {
                 MediaGrid(urls: images, cornerRadius: 0, singleAspect: nil, showsBorder: false)
@@ -166,33 +182,6 @@ struct LinkedInPostCard: View {
                 Image(systemName: "xmark").font(.system(size: 14, weight: .semibold))
             }
             .foregroundStyle(LinkedInTheme.secondary)
-        }
-    }
-
-    @ViewBuilder
-    private var postText: some View {
-        let font = Font.system(size: 14)
-        if plain.count <= LinkedInTheme.fold {
-            Text(plain).font(font).foregroundStyle(LinkedInTheme.text).lineSpacing(4)
-                .textSelection(.enabled)
-        } else {
-            let idx = plain.index(plain.startIndex, offsetBy: LinkedInTheme.fold)
-            let head = String(plain[..<idx])
-            let tail = String(plain[idx...])
-            VStack(alignment: .leading, spacing: 6) {
-                (Text(head) + Text("…more").foregroundColor(LinkedInTheme.secondary).fontWeight(.semibold))
-                    .font(font).foregroundStyle(LinkedInTheme.text).lineSpacing(4)
-                    .textSelection(.enabled)
-                HStack(spacing: 8) {
-                    Line().stroke(style: StrokeStyle(lineWidth: 1, dash: [4, 4])).foregroundStyle(LinkedInTheme.secondary.opacity(0.6)).frame(height: 1)
-                    Text("fold · hidden until “…more” is clicked")
-                        .font(.system(size: 10, weight: .medium)).foregroundStyle(LinkedInTheme.secondary)
-                        .fixedSize()
-                    Line().stroke(style: StrokeStyle(lineWidth: 1, dash: [4, 4])).foregroundStyle(LinkedInTheme.secondary.opacity(0.6)).frame(height: 1)
-                }
-                Text(tail).font(font).foregroundStyle(LinkedInTheme.text).lineSpacing(4)
-                    .textSelection(.enabled)
-            }
         }
     }
 

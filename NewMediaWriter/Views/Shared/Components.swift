@@ -11,10 +11,16 @@ extension Color {
 
     /// Picks a light/dark variant following the current appearance.
     static func adaptive(light: UInt32, dark: UInt32) -> Color {
-        Color(nsColor: NSColor(name: nil) { appearance in
+        Color(nsColor: .adaptive(light: light, dark: dark))
+    }
+}
+
+extension NSColor {
+    static func adaptive(light: UInt32, dark: UInt32) -> NSColor {
+        NSColor(name: nil) { appearance in
             let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             return NSColor(Color(hex: isDark ? dark : light))
-        })
+        }
     }
 }
 
