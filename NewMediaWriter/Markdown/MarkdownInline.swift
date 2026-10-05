@@ -23,12 +23,19 @@ enum MarkdownInline {
     static func attributedExposingLinks(_ text: String) -> AttributedString {
         let source = attributed(text)
         var out = AttributedString()
-        for run in source.runs {
+        var linkText = ""
+        let runs = Array(source.runs)
+        for (i, run) in runs.enumerated() {
             var piece = AttributedString(source[run.range])
             if let link = run.link {
-                let shown = String(piece.characters)
-                if !isBareURL(shown, link) {
-                    piece += AttributedString(" (\(link.absoluteString))")
+                // A label with inline formatting spans several runs; append the URL once, after the last.
+                linkText += String(piece.characters)
+                let next = i + 1 < runs.count ? runs[i + 1].link : nil
+                if next != link {
+                    if !isBareURL(linkText, link) {
+                        piece += AttributedString(" (\(link.absoluteString))")
+                    }
+                    linkText = ""
                 }
                 piece.link = nil
             }

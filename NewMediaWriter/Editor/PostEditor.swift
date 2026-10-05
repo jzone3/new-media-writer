@@ -44,14 +44,14 @@ struct PostEditor: NSViewRepresentable {
         textView.documentURL = documentURL
         textView.foldAfterVisibleCharacters = foldAfter
         let current = textView.string
-        guard current != text else {
-            context.coordinator.sentTexts.removeAll()
-            return
-        }
-        // SwiftUI can call this with a value one keystroke behind the text view (a newline grows the
-        // card, which triggers an extra layout pass). Echoes of our own edits must never overwrite
-        // what the user has typed since; thread segments also arrive trimmed, so compare loosely.
-        if context.coordinator.isEcho(text) { return }
+        guard current != text else { return }
+        // While the user is typing, SwiftUI can call this with a value one keystroke behind the text
+        // view (a newline grows the card, which triggers an extra layout pass). Echoes of our own
+        // edits must never overwrite what has been typed since; thread segments also arrive trimmed,
+        // so compare loosely. Edits from elsewhere (Markdown view, undo, Add another post) only
+        // happen while the card is not focused and always win.
+        let isTyping = textView.window?.firstResponder === textView
+        if isTyping, context.coordinator.isEcho(text) { return }
         context.coordinator.sentTexts.removeAll()
         let sel = textView.selectedRange()
         textView.string = text
@@ -91,6 +91,10 @@ struct PostEditor: NSViewRepresentable {
         func isEcho(_ text: String) -> Bool {
             let incoming = text.trimmingCharacters(in: .whitespacesAndNewlines)
             return sentTexts.contains { $0.trimmingCharacters(in: .whitespacesAndNewlines) == incoming }
+        }
+
+        func textDidEndEditing(_ notification: Notification) {
+            sentTexts.removeAll()
         }
 
         func undoManager(for view: NSTextView) -> UndoManager? { parent.undoManager }
