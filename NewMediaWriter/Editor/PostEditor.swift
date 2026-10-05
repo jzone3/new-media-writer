@@ -7,6 +7,7 @@ struct PostEditor: NSViewRepresentable {
     var theme: EditorTheme
     var documentURL: URL?
     var foldAfter: Int? = nil
+    var foldStyle = FoldMarkerStyle()
     var takesFocusOnAppear = false
     var onChange: (String) -> Void
     @Environment(\.undoManager) private var undoManager
@@ -32,6 +33,7 @@ struct PostEditor: NSViewRepresentable {
         textView.documentURL = documentURL
         textView.styler.theme = theme
         textView.foldAfterVisibleCharacters = foldAfter
+        textView.foldStyle = foldStyle
         textView.takesFocusOnAppear = takesFocusOnAppear
         textView.string = text
         textView.restyleAndRelayout()
@@ -43,6 +45,7 @@ struct PostEditor: NSViewRepresentable {
         context.coordinator.parent = self
         textView.documentURL = documentURL
         textView.foldAfterVisibleCharacters = foldAfter
+        textView.foldStyle = foldStyle
         // Thread segments arrive trimmed; don't yank a trailing newline the user just typed.
         let current = textView.string
         if current != text,

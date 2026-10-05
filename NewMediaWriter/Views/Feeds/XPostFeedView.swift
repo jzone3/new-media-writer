@@ -6,6 +6,10 @@ enum XTheme {
     static let secondary = Color.adaptive(light: 0x536471, dark: 0x71767B)
     static let border = Color.adaptive(light: 0xEFF3F4, dark: 0x2F3336)
     static let limit = 25_000
+    /// x.com truncates long (Premium) posts in the timeline after roughly this many characters.
+    static let fold = 280
+    static let foldStyle = FoldMarkerStyle(label: "Show more", labelColor: NSColor(blue),
+                                           lineColor: .adaptive(light: 0xEFF3F4, dark: 0x2F3336))
     static let columnWidth: CGFloat = 600
 
     static let editorTheme = EditorTheme.post(
@@ -240,6 +244,7 @@ struct XPostCell: View {
                     .font(.system(size: 15))
 
                     PostEditor(text: markdown, theme: XTheme.editorTheme, documentURL: baseURL,
+                               foldAfter: XTheme.fold, foldStyle: XTheme.foldStyle,
                                takesFocusOnAppear: takesFocus, onChange: onEdit)
                         .overlay(alignment: .topLeading) {
                             if markdown.isEmpty {
