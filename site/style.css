@@ -183,6 +183,29 @@ footer a:hover{color:var(--ink)}
   .hero{margin-top:36px}
   .lede{font-size:17px}
 }
+/* ---------- mobile: demo first, title animates in, everything else below the fold ---------- */
+@media (max-width:768px){
+  main{display:flex;flex-direction:column}
+  .demo{order:-1;min-height:calc(100svh - 72px);display:flex;flex-direction:column;justify-content:flex-start;padding:5svh 16px 12px}
+  /* crop the 960px window to its content column (x 110–830) so the text is readable; the titlebar becomes a
+     solid bar above the content instead of floating over it */
+  .window-scale{--crop-x:110;--crop-w:720;aspect-ratio:720/644;border-radius:12px;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 24px 60px -24px rgba(0,0,0,.25)}
+  .window{height:644px;box-shadow:none;border-radius:0}
+  .titlebar{inset:0 130px auto 110px;background:#fff;border-bottom:1px solid #eee}
+  .stage{top:44px}
+  .count-pill{right:222px}
+  .copy-pill{right:146px}
+  .sl-side{width:110px}
+  .sl-side>*{visibility:hidden}
+  .caption{display:none}
+  .demo h1.script{margin:34px 0 0;opacity:0;transform:translateY(14px);transition:opacity .9s ease,transform .9s cubic-bezier(.2,.7,.2,1)}
+  .demo h1.script.in{opacity:1;transform:none}
+  .hero{margin-top:48px}
+  .hero h1.script{display:none}
+}
+@media (max-width:768px) and (prefers-reduced-motion:reduce){
+  .demo h1.script{opacity:1;transform:none;transition:none}
+}
 @media (prefers-reduced-motion:reduce){
   .cursor{display:none}
   .view,.btn{transition:none}

@@ -55,8 +55,31 @@ That to secure these rights, Governments are instituted among Men, deriving thei
   clicks.push({ view: 'plaintext', moveStart: t, clickAt: t + MOVE + 90 });
   const END = t + MOVE + 90 + 900;
 
+  // Phones: the demo leads, cropped to its content column via --crop-x/--crop-w (style.css), and the
+  // script title slides in under it once the window is on screen. Desktop keeps the title on top.
+  const mobile = matchMedia('(max-width: 768px)');
+  const title = document.querySelector('.hero h1.script');
+  const placeTitle = () => {
+    if (!title) return;
+    if (mobile.matches) {
+      if (title.parentElement !== scaleBox.parentElement) scaleBox.parentElement.appendChild(title);
+      setTimeout(() => title.classList.add('in'), reduce ? 0 : 700);
+    } else if (title.parentElement !== document.querySelector('.hero')) {
+      document.querySelector('.hero').prepend(title);
+      title.classList.remove('in');
+    }
+  };
+  placeTitle();
+  mobile.addEventListener('change', placeTitle);
+
   // Keep the 960x600 window crisp at any width.
-  const fit = () => { win.style.transform = `scale(${scaleBox.clientWidth / 960})`; };
+  const fit = () => {
+    const cs = getComputedStyle(scaleBox);
+    const cropX = parseFloat(cs.getPropertyValue('--crop-x')) || 0;
+    const cropW = parseFloat(cs.getPropertyValue('--crop-w')) || 960;
+    const s = scaleBox.clientWidth / cropW;
+    win.style.transform = `translate(${-cropX * s}px, 0) scale(${s})`;
+  };
   new ResizeObserver(fit).observe(scaleBox);
   fit();
 
