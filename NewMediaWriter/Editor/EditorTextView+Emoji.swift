@@ -38,7 +38,7 @@ extension EditorTextView {
         let items = EmojiCatalog.search(trigger.query)
         guard !items.isEmpty else { emojiPopup.hide(); return }
         emojiPopup.onPick = { [weak self] entry in self?.insertEmoji(entry) }
-        emojiPopup.show(items, below: caretScreenRect(), in: window)
+        emojiPopup.show(items, query: trigger.query, below: caretScreenRect(), in: window)
     }
 
     private func insertEmoji(_ entry: EmojiCatalog.Entry) {

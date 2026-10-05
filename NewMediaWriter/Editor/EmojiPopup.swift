@@ -5,6 +5,7 @@ import SwiftUI
 final class EmojiPopup {
     private(set) var items: [EmojiCatalog.Entry] = []
     private(set) var selection = 0
+    private(set) var query = ""
     var onPick: ((EmojiCatalog.Entry) -> Void)?
 
     private let panel: NSPanel = {
@@ -22,10 +23,11 @@ final class EmojiPopup {
 
     var isVisible: Bool { panel.isVisible }
 
-    func show(_ items: [EmojiCatalog.Entry], below caret: NSRect, in parent: NSWindow) {
+    func show(_ items: [EmojiCatalog.Entry], query: String, below caret: NSRect, in parent: NSWindow) {
         guard !items.isEmpty else { hide(); return }
         if items != self.items { selection = 0 }
         self.items = items
+        self.query = query
         if panel.contentView !== host {
             host.autoresizingMask = [.width, .height]
             panel.contentView = host
@@ -61,6 +63,7 @@ final class EmojiPopup {
         panel.parent?.removeChildWindow(panel)
         panel.orderOut(nil)
         items = []
+        query = ""
         selection = 0
     }
 
@@ -80,7 +83,7 @@ final class EmojiPopup {
     }
 
     private var list: EmojiList {
-        EmojiList(items: items, selection: selection,
+        EmojiList(items: items, query: query, selection: selection,
                   onHover: { [weak self] i in
                       guard let self, self.selection != i else { return }
                       self.selection = i
@@ -92,40 +95,83 @@ final class EmojiPopup {
 
 private struct EmojiList: View {
     let items: [EmojiCatalog.Entry]
+    let query: String
     let selection: Int
     let onHover: (Int) -> Void
     let onPick: (EmojiCatalog.Entry) -> Void
 
-    static let rowWidth: CGFloat = 260
-    static let rowHeight: CGFloat = 26
-    static let rowSpacing: CGFloat = 1
-    static let inset: CGFloat = 6
+    static let width: CGFloat = 300
+    static let headerHeight: CGFloat = 30
+    static let rowHeight: CGFloat = 28
+    static let listPadding: CGFloat = 4
+    static let footerHeight: CGFloat = 28
+    static let hairline: CGFloat = 1
+    static let radius: CGFloat = 8
 
     /// Fixed geometry, so the panel can be sized without asking SwiftUI (fittingSize is unreliable before first layout).
     static func size(rows: Int) -> NSSize {
-        NSSize(width: rowWidth + inset * 2,
-               height: CGFloat(rows) * rowHeight + CGFloat(max(rows - 1, 0)) * rowSpacing + inset * 2)
+        NSSize(width: width,
+               height: headerHeight + hairline + listPadding * 2 + CGFloat(rows) * rowHeight + hairline + footerHeight)
     }
 
+    private static let background = Color.adaptive(light: 0xFFFFFF, dark: 0x1A1D21)
+    private static let border = Color(nsColor: NSColor(name: nil) { ap in
+        ap.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? NSColor.white.withAlphaComponent(0.14) : NSColor.black.withAlphaComponent(0.12)
+    })
+    private static let highlight = Color(nsColor: NSColor(name: nil) { ap in
+        ap.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(Color(hex: 0x1D9BD1, opacity: 0.22))
+            : NSColor(Color(hex: 0x1264A3, opacity: 0.12))
+    })
+
     var body: some View {
-        VStack(alignment: .leading, spacing: Self.rowSpacing) {
-            ForEach(Array(items.enumerated()), id: \.element) { i, e in
-                HStack(spacing: 10) {
-                    Text(e.emoji).font(.system(size: 17))
-                    Text(":\(e.name):").font(.system(size: 13, weight: .medium, design: .monospaced))
-                    Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 0) {
+            Text("EMOJI MATCHING \":\(query)\"")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .padding(.horizontal, 12)
+                .frame(width: Self.width, height: Self.headerHeight, alignment: .leading)
+            Self.border.frame(height: Self.hairline)
+            VStack(spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.element) { i, e in
+                    HStack(spacing: 10) {
+                        Text(e.emoji).font(.system(size: 18))
+                        Text(shortcode(e.name)).font(.system(size: 13))
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(width: Self.width, height: Self.rowHeight, alignment: .leading)
+                    .foregroundStyle(.primary)
+                    .background(i == selection ? Self.highlight : Color.clear)
+                    .contentShape(Rectangle())
+                    .onHover { if $0 { onHover(i) } }
+                    .onTapGesture { onPick(e) }
                 }
-                .padding(.horizontal, 10)
-                .frame(width: Self.rowWidth, height: Self.rowHeight, alignment: .leading)
-                .foregroundStyle(i == selection ? Color.white : Color.primary)
-                .background(i == selection ? Color.accentColor : Color.clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .contentShape(Rectangle())
-                .onHover { if $0 { onHover(i) } }
-                .onTapGesture { onPick(e) }
             }
+            .padding(.vertical, Self.listPadding)
+            Self.border.frame(height: Self.hairline)
+            HStack(spacing: 14) {
+                Text("↑↓ to navigate")
+                Text("↩ to select")
+                Text("esc to dismiss")
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .frame(width: Self.width, height: Self.footerHeight, alignment: .leading)
         }
-        .padding(Self.inset)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(.primary.opacity(0.12)))
+        .background(Self.background)
+        .clipShape(RoundedRectangle(cornerRadius: Self.radius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Self.radius, style: .continuous).strokeBorder(Self.border))
+    }
+
+    /// `:fire:` with the part that matched the query in bold, like Slack.
+    private func shortcode(_ name: String) -> AttributedString {
+        var text = AttributedString(":\(name):")
+        if !query.isEmpty, let hit = text.range(of: query, options: .caseInsensitive) {
+            text[hit].font = .system(size: 13, weight: .bold)
+        }
+        return text
     }
 }
