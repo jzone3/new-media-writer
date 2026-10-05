@@ -8,14 +8,15 @@ is what keeps "New Media Writer" / "Applications" readable, and it gives the arr
 """
 import os
 import random
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 WIDTH, HEIGHT = 660, 400
 ARROW_Y = 180          # vertical centre of the icons (build-dmg.sh uses the same value)
-ARROW_LEN, HEAD, STROKE = 72, 18, 3
+ARROW_LEN, HEAD, STROKE = 56, 12, 2
 BG = (13, 13, 13)
-CARD = (70, 92, 590, 296)   # rounded white card; icons (128pt) + Finder labels fall inside it
-CARD_RADIUS = 18
+CARD = (72, 100, 588, 288)  # rounded white card; icons (128pt) + Finder labels fall inside it
+CARD_RADIUS = 14
+ARROW_COLOR = (29, 29, 31)
 CW, CH = 9, 14         # glyph cell (points)
 RAMP = ". . . : : - = + * # % @ 8 0 B M".split()
 OUT = os.path.join(os.path.dirname(__file__), "..", "dmg")
@@ -43,21 +44,25 @@ def render(scale):
             n = 0.65 * n1.getpixel((c, r)) + 0.35 * n2.getpixel((c, r))
             n = max(0.0, min(1.0, (n - 0.5) * 1.6 + 0.5))
             dens = n * 0.5 if n < 0.5 else 0.25 + (n - 0.5) * 1.5
-            if jitter.random() > min(1.0, dens) * 0.9 + 0.05:
+            if jitter.random() > min(1.0, dens) * 0.55 + 0.02:
                 continue
             ch = RAMP[min(len(RAMP) - 1, int(n * len(RAMP)))]
             x, y = c * CW, r * CH
-            a = 0.18 + 0.55 * n
-            v = int(13 + a * 215)
+            a = 0.10 + 0.32 * n
+            v = int(13 + a * 150)
             d.text((x * scale, y * scale), ch, font=font, fill=(v, v, v))
-    d.rounded_rectangle([v * scale for v in CARD], radius=CARD_RADIUS * scale, fill="white",
-                        outline=(225, 225, 225), width=scale)
+    shadow = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).rounded_rectangle([(CARD[0] - 2) * scale, (CARD[1] + 4) * scale, (CARD[2] + 2) * scale, (CARD[3] + 10) * scale],
+                                             radius=(CARD_RADIUS + 2) * scale, fill=(0, 0, 0, 170))
+    img.paste(shadow.filter(ImageFilter.GaussianBlur(10 * scale)), (0, 0), shadow.filter(ImageFilter.GaussianBlur(10 * scale)))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([v * scale for v in CARD], radius=CARD_RADIUS * scale, fill="white")
     cx, cy = WIDTH / 2, ARROW_Y
     x0, x1 = (cx - ARROW_LEN / 2) * scale, (cx + ARROW_LEN / 2) * scale
     y, w = cy * scale, STROKE * scale
     for pts in ([(x0, y), (x1, y)], [(x1 - HEAD * scale, y - HEAD * scale), (x1, y)], [(x1 - HEAD * scale, y + HEAD * scale), (x1, y)]):
-        d.line(pts, fill="black", width=w)
-    d.ellipse([x1 - w / 2, y - w / 2, x1 + w / 2, y + w / 2], fill="black")
+        d.line(pts, fill=ARROW_COLOR, width=w, joint="curve")
+    d.ellipse([x1 - w / 2, y - w / 2, x1 + w / 2, y + w / 2], fill=ARROW_COLOR)
     return img
 
 
