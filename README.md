@@ -57,5 +57,7 @@ from Xcode.
 | LinkedIn | ⌘4 |
 | Slack | ⌘5 |
 | Copy for current view | ⇧⌘C |
+| Bold / Italic / Inline code (toggle `**` / `*` / `` ` `` around the selection) | ⌘B / ⌘I / ⌘E |
+| Insert link (uses a URL from the clipboard if there is one) | ⌘K |
 
 Set your name, handle, headline, avatar and Slack channel in **Settings (⌘,)** so previews look like you.
