@@ -15,7 +15,8 @@ enum SlackTheme {
         text: .adaptive(light: 0x1D1C1D, dark: 0xD1D2D3),
         secondary: .adaptive(light: 0x616061, dark: 0xABABAD),
         accent: NSColor(Color(hex: 0x1264A3)),
-        codeBackground: .adaptive(light: 0xF8F8F8, dark: 0x222529)
+        codeBackground: .adaptive(light: 0xF8F8F8, dark: 0x222529),
+        lineHeightMultiple: 1.45
     )
 }
 

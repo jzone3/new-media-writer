@@ -31,6 +31,7 @@ struct XPostFeedView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     header
+                    composer
                     ghostPost(seed: 0)
                     ForEach(Array(thread.enumerated()), id: \.offset) { i, segment in
                         XPostCell(markdown: segment.text, baseURL: baseURL, profile: profile,
@@ -45,7 +46,7 @@ struct XPostFeedView: View {
                 .overlay(alignment: .leading) { XTheme.border.frame(width: 1) }
                 .overlay(alignment: .trailing) { XTheme.border.frame(width: 1) }
                 .frame(maxWidth: .infinity)
-                .padding(.top, 36)
+                .padding(.top, 44)
             }
 
             HStack(spacing: 8) {
@@ -88,6 +89,32 @@ struct XPostFeedView: View {
             .frame(height: 53)
             XTheme.border.frame(height: 1)
         }
+    }
+
+    private var composer: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                AvatarView(profile: profile, size: 40)
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("What is happening?!")
+                        .font(.system(size: 20)).foregroundStyle(XTheme.secondary)
+                        .padding(.top, 8)
+                    HStack(spacing: 16) {
+                        ForEach(["photo", "list.bullet.rectangle", "face.smiling", "calendar", "mappin.and.ellipse"], id: \.self) {
+                            Image(systemName: $0).font(.system(size: 15)).foregroundStyle(XTheme.blue)
+                        }
+                        Spacer()
+                        Text("Post")
+                            .font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
+                            .padding(.horizontal, 16).padding(.vertical, 7)
+                            .background(XTheme.blue.opacity(0.5), in: Capsule())
+                    }
+                }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+            XTheme.border.frame(height: 1)
+        }
+        .opacity(0.8)
     }
 
     private func tab(_ title: String, active: Bool) -> some View {
