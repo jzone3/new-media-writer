@@ -7,6 +7,7 @@ struct PostEditor: NSViewRepresentable {
     var theme: EditorTheme
     var documentURL: URL?
     var foldAfter: Int? = nil
+    var takesFocusOnAppear = false
     var onChange: (String) -> Void
     @Environment(\.undoManager) private var undoManager
 
@@ -31,6 +32,7 @@ struct PostEditor: NSViewRepresentable {
         textView.documentURL = documentURL
         textView.styler.theme = theme
         textView.foldAfterVisibleCharacters = foldAfter
+        textView.takesFocusOnAppear = takesFocusOnAppear
         textView.string = text
         textView.restyleAndRelayout()
         context.coordinator.textView = textView

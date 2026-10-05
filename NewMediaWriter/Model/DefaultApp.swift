@@ -43,6 +43,13 @@ enum DefaultApp {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Dock click with no windows open: a new Untitled document instead of DocumentGroup's Open panel.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        guard !hasVisibleWindows else { return true }
+        NSDocumentController.shared.newDocument(nil)
+        return false
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // DocumentGroup opens its Open panel when launched with nothing to open (and ignores
         // applicationShouldOpenUntitledFile). Swap that launch panel for an Untitled document; a

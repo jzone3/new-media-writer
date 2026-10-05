@@ -25,6 +25,7 @@ struct XPostFeedView: View {
     private var text: String { document.text }
     private var thread: [MarkdownParser.ThreadSegment] { MarkdownParser.thread(text) }
     private var segments: [String] { thread.map(\.text) }
+    @State private var focusedNewPost: Int?
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -35,8 +36,10 @@ struct XPostFeedView: View {
                     ForEach(Array(thread.enumerated()), id: \.offset) { i, segment in
                         XPostCell(markdown: segment.text, baseURL: baseURL, profile: profile,
                                   isThread: thread.count > 1, isLast: i == thread.count - 1, index: i,
+                                  takesFocus: focusedNewPost == i,
                                   onEdit: { replace(segment, at: i, with: $0) })
                     }
+                    addToThreadRow
                     ghostPost(seed: 1)
                     ghostPost(seed: 2)
                     ghostPost(seed: 3)
@@ -55,6 +58,30 @@ struct XPostFeedView: View {
             }
             .padding(16)
         }
+    }
+
+    private var addToThreadRow: some View {
+        Button {
+            let trimmed = text.replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression)
+            focusedNewPost = thread.count
+            document.text = trimmed.isEmpty ? "\n\n---\n\n" : trimmed + "\n\n---\n\n"
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "plus.circle")
+                    .font(.system(size: 20, weight: .light))
+                    .frame(width: 40)
+                Text("Add another post")
+                    .font(.system(size: 15))
+                Spacer()
+            }
+            .foregroundStyle(XTheme.blue)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Add a post to the thread (inserts a --- separator)")
+        .overlay(alignment: .bottom) { XTheme.border.frame(height: 1) }
     }
 
     /// Writes an edited post back into its slice of the document, keeping the `---` separators padded.
@@ -142,6 +169,7 @@ struct XPostCell: View {
     var isThread = false
     var isLast = true
     var index = 0
+    var takesFocus = false
     var onEdit: (String) -> Void = { _ in }
     @State private var copied = false
 
@@ -176,14 +204,33 @@ struct XPostCell: View {
                             .buttonStyle(.plain)
                             .help("Copy post \(index + 1)")
                         }
-                        Image(systemName: "ellipsis").foregroundStyle(XTheme.secondary)
+                        Menu {
+                            Button("Copy") {
+                                Exporter.xPost(markdown).copy()
+                                copied = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
+                            }
+                            Button("Follow me") {
+                                NSWorkspace.shared.open(URL(string: "https://x.com/imjaredz")!)
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .foregroundStyle(XTheme.secondary)
+                                .frame(width: 24, height: 20)
+                                .contentShape(Rectangle())
+                        }
+                        .menuStyle(.button)
+                        .buttonStyle(.plain)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
                     }
                     .font(.system(size: 15))
 
-                    PostEditor(text: markdown, theme: XTheme.editorTheme, documentURL: baseURL, onChange: onEdit)
+                    PostEditor(text: markdown, theme: XTheme.editorTheme, documentURL: baseURL,
+                               takesFocusOnAppear: takesFocus, onChange: onEdit)
                         .overlay(alignment: .topLeading) {
                             if markdown.isEmpty {
-                                Text(index == 0 ? "What is happening?!" : "Add another post…")
+                                Text(index == 0 ? "What is happening?!" : "Post \(index + 1)…")
                                     .font(.system(size: 15)).foregroundStyle(XTheme.secondary)
                                     .allowsHitTesting(false)
                             }
