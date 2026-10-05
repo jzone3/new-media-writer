@@ -7,6 +7,7 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
     static let shared = UpdateChecker()
     static let latestReleaseURL = URL(string: "https://api.github.com/repos/jzone3/new-media-writer/releases/latest")!
     static let assetName = "New-Media-Writer.dmg"
+    static let latestDownloadURL = URL(string: "https://github.com/jzone3/new-media-writer/releases/latest/download/\(assetName)")!
     static let checkInterval: TimeInterval = 24 * 60 * 60
     private static let lastCheckKey = "updateLastCheck"
     private static let skippedVersionKey = "updateSkippedVersion"
@@ -34,6 +35,11 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
     struct Release {
         let version: Version
         let downloadURL: URL
+
+        init(version: Version, downloadURL: URL) {
+            self.version = version
+            self.downloadURL = downloadURL
+        }
 
         init?(json: Data) {
             guard let object = try? JSONSerialization.jsonObject(with: json) as? [String: Any],
@@ -69,13 +75,47 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
         var request = URLRequest(url: Self.latestReleaseURL, timeoutInterval: 10)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         URLSession.shared.dataTask(with: request) { data, response, _ in
-            let release = (response as? HTTPURLResponse)?.statusCode == 200 ? data.flatMap(Release.init(json:)) : nil
-            DispatchQueue.main.async {
-                self.isChecking = false
-                if release != nil { UserDefaults.standard.set(Date(), forKey: Self.lastCheckKey) }
-                self.handle(release, userInitiated: userInitiated)
+            switch (response as? HTTPURLResponse)?.statusCode {
+            case 200: self.finishCheck(data.flatMap(Release.init(json:)), userInitiated: userInitiated)
+            case 403, 429: self.probeLatestRedirect(userInitiated: userInitiated)
+            default: self.finishCheck(nil, userInitiated: userInitiated)
             }
         }.resume()
+    }
+
+    /// The unauthenticated API allows 60 requests/hour per IP, so on a shared network it often answers 403.
+    /// The stable download link redirects to `/releases/download/vX.Y.Z/…` and isn't rate-limited.
+    private func probeLatestRedirect(userInitiated: Bool) {
+        var request = URLRequest(url: Self.latestDownloadURL, timeoutInterval: 10)
+        request.httpMethod = "HEAD"
+        let session = URLSession(configuration: .ephemeral, delegate: RedirectCatcher(), delegateQueue: nil)
+        session.dataTask(with: request) { _, response, _ in
+            var release: Release?
+            if let http = response as? HTTPURLResponse, (300..<400).contains(http.statusCode),
+               let location = http.value(forHTTPHeaderField: "Location").flatMap({ URL(string: $0, relativeTo: Self.latestDownloadURL)?.absoluteURL }),
+               location.scheme == "https", location.host == "github.com",
+               location.pathComponents.count >= 3, location.lastPathComponent == Self.assetName,
+               let version = Version(location.pathComponents[location.pathComponents.count - 2]) {
+                release = Release(version: version, downloadURL: location)
+            }
+            session.finishTasksAndInvalidate()
+            self.finishCheck(release, userInitiated: userInitiated)
+        }.resume()
+    }
+
+    private final class RedirectCatcher: NSObject, URLSessionTaskDelegate {
+        func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                        newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+            completionHandler(nil)
+        }
+    }
+
+    private func finishCheck(_ release: Release?, userInitiated: Bool) {
+        DispatchQueue.main.async {
+            self.isChecking = false
+            if release != nil { UserDefaults.standard.set(Date(), forKey: Self.lastCheckKey) }
+            self.handle(release, userInitiated: userInitiated)
+        }
     }
 
     private func handle(_ release: Release?, userInitiated: Bool) {
