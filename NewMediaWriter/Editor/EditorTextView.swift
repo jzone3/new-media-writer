@@ -67,8 +67,8 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     /// Feed cards show media in their own grid, so the editor skips inline image rendering.
     var showsImages = true
     /// Draws a dashed fold line + label after this many visible (non-marker) characters.
-    var foldAfterVisibleCharacters: Int? { didSet { foldIndexCache = nil; needsDisplay = true } }
-    var foldStyle = FoldMarkerStyle() { didSet { needsDisplay = true } }
+    var foldAfterVisibleCharacters: Int? { didSet { if oldValue != foldAfterVisibleCharacters { relayoutFold() } } }
+    var foldStyle = FoldMarkerStyle() { didSet { if oldValue.label != foldStyle.label { relayoutFold() } else { needsDisplay = true } } }
     /// Embedded editors only reveal syntax in the cursor's paragraph while they have keyboard focus.
     var revealsMarkersOnlyWhenFocused = false
 
@@ -348,7 +348,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
          .foregroundColor: foldStyle.labelColor ?? styler.theme.secondary]
     }
 
-    /// Character index where the fold falls, if the text runs past `foldAfterVisibleCharacters`.
+    /// Index of the last character shown above the fold, if the text runs past `foldAfterVisibleCharacters`.
     private func foldCharacterIndex() -> Int? {
         if let cached = foldIndexCache { return cached }
         let index = computeFoldCharacterIndex()
@@ -361,17 +361,18 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     private func computeFoldCharacterIndex() -> Int? {
         guard let fold = foldAfterVisibleCharacters, fold > 0, let textStorage, textStorage.length > 0 else { return nil }
         var visible = 0
+        var lastShown: Int?
         var i = 0
         while i < textStorage.length {
             var effective = NSRange()
             let isMarker = textStorage.attribute(.mdMarker, at: i, effectiveRange: &effective) != nil
             if !isMarker {
-                if visible + effective.length > fold { return i + (fold - visible) }
+                if lastShown == nil, visible + effective.length >= fold { lastShown = i + (fold - visible) - 1 }
                 visible += effective.length
             }
             i = effective.location + effective.length
         }
-        return nil
+        return visible > fold ? lastShown : nil
     }
 
     /// Height reserved below the folded line for the dashed rule and its label.
@@ -384,6 +385,14 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         guard NSLocationInRange(foldIndex, chars) else { return false }
         lineFragmentRect.pointee.size.height += foldMarkerHeight
         return true
+    }
+
+    /// Fold settings changed: every line may gain or lose the marker's height.
+    private func relayoutFold() {
+        foldIndexCache = nil
+        needsDisplay = true
+        guard let layoutManager, let textStorage, textStorage.length > 0 else { return }
+        layoutManager.invalidateLayout(forCharacterRange: NSRange(location: 0, length: textStorage.length), actualCharacterRange: nil)
     }
 
     /// After an edit the fold may sit on a different line; relayout both so only the new one carries the extra height.
