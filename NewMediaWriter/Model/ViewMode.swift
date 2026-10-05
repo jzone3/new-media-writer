@@ -94,6 +94,10 @@ struct ViewCommands: Commands {
             .keyboardShortcut("c", modifiers: [.command, .shift])
             .disabled(viewMode == nil)
         }
+        // There is no help book; the stock item only showed "Help isn't available".
+        CommandGroup(replacing: .help) {
+            Button("New Media Writer Help") { NSWorkspace.shared.open(URL(string: "https://newmediawriter.app/")!) }
+        }
     }
 
     private func send(_ action: Selector) {
