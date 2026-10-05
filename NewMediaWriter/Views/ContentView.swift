@@ -3,7 +3,8 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var document: MarkdownDocument
     var fileURL: URL?
-    @AppStorage("viewMode") private var mode: ViewMode = .markdown
+    // Per-window; new windows start in the view used most recently.
+    @State private var mode: ViewMode = .lastUsed
     @Environment(\.colorScheme) private var colorScheme
     @State private var pickerShown = false
 
@@ -34,6 +35,7 @@ struct ContentView: View {
         .focusedSceneValue(\.viewPickerShown, $pickerShown)
         .animation(.easeOut(duration: 0.12), value: pickerShown)
         .animation(.easeOut(duration: 0.15), value: mode)
+        .onChange(of: mode) { _, new in ViewMode.lastUsed = new }
     }
 
     @ViewBuilder

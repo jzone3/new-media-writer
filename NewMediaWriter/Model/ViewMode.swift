@@ -28,6 +28,13 @@ enum ViewMode: String, CaseIterable, Identifiable, Codable {
     var shortcutLabel: String { "⌘\(shortcut.character)" }
 
     var isEditor: Bool { self == .markdown || self == .plaintext }
+
+    private static let lastUsedKey = "viewMode"
+
+    static var lastUsed: ViewMode {
+        get { UserDefaults.standard.string(forKey: lastUsedKey).flatMap(ViewMode.init(rawValue:)) ?? .markdown }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: lastUsedKey) }
+    }
 }
 
 struct ViewModeFocusedKey: FocusedValueKey {
