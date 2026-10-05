@@ -37,12 +37,55 @@ enum EmojiCatalog {
             guard out.count < limit, seen.insert(e.name).inserted else { return }
             out.append(e)
         }
-        let byLength: (Entry, Entry) -> Bool = { ($0.name.count, $0.name) < ($1.name.count, $1.name) }
+        let byLength: (Entry, Entry) -> Bool = {
+            (popularity[$0.name] ?? popular.count, $0.name.count, $0.name) < (popularity[$1.name] ?? popular.count, $1.name.count, $1.name)
+        }
         for e in entries.filter({ $0.name.hasPrefix(q) }).sorted(by: byLength) { add(e) }
         for e in entries.filter({ $0.name.contains(q) }).sorted(by: byLength) { add(e) }
         for e in entries where e.tags.contains(where: { $0.hasPrefix(q) }) { add(e) }
         return out
     }
+
+    /// Everyday Slack favourites, ranked ahead of alphabetical neighbours (`fi` → fire before fiji).
+    private static let popular = [
+        "fire", "tada", "rocket", "+1", "thumbsup", "-1", "heart", "eyes", "100", "joy", "pray", "wave", "clap",
+        "sparkles", "white_check_mark", "x", "warning", "bulb", "thinking", "sweat_smile", "smile", "grin", "laughing",
+        "raised_hands", "point_up", "point_down", "point_right", "memo", "ship", "bug", "zap", "star", "sob", "cry",
+        "heart_eyes", "sunglasses", "muscle", "ok_hand", "handshake", "facepalm", "shrug", "skull", "melting_face",
+        "partying_face", "pleading_face", "salute", "saluting_face", "exploding_head", "mind_blown", "see_no_evil",
+        "coffee", "pizza", "beer", "champagne", "trophy", "chart_with_upwards_trend", "money_with_wings", "moneybag",
+        "hourglass", "alarm_clock", "calendar", "link", "lock", "key", "mag", "wrench", "hammer", "gear", "package",
+        "construction", "no_entry", "red_circle", "large_green_circle", "large_yellow_circle", "heavy_check_mark",
+        "ballot_box_with_check", "question", "exclamation", "arrow_right", "arrow_up", "arrow_down", "fast_forward",
+        "soon", "new", "ok", "sos", "wink", "blush", "innocent", "upside_down_face", "nerd_face", "zany_face",
+        "woozy_face", "hugs", "kissing_heart", "yum", "star_struck", "fearful", "scream", "rage", "angry", "disappointed",
+        "unamused", "neutral_face", "expressionless", "grimacing", "roll_eyes", "zipper_mouth_face", "face_with_monocle",
+        "hot_face", "cold_face", "nauseated_face", "mask", "sleeping", "ghost", "robot", "alien", "poop", "dog", "cat",
+        "unicorn", "turtle", "snake", "bee", "butterfly", "cactus", "seedling", "evergreen_tree", "four_leaf_clover",
+        "sunny", "cloud", "rainbow", "snowflake", "earth_americas", "globe_with_meridians", "house", "office", "car",
+        "airplane", "train", "bike", "boat", "anchor", "fireworks", "balloon", "gift", "confetti_ball", "birthday", "cake",
+        "apple", "taco", "burrito", "sushi", "ramen", "cookie", "doughnut", "ice_cream", "wine_glass", "cocktail", "tea",
+        "soccer", "basketball", "football", "baseball", "tennis", "dart", "video_game", "guitar", "microphone", "headphones",
+        "books", "pencil2", "paperclip", "pushpin", "scissors", "email", "inbox_tray", "outbox_tray", "bell", "loudspeaker",
+        "mega", "speech_balloon", "thought_balloon", "iphone", "computer", "keyboard", "desktop_computer", "printer",
+        "tv", "camera", "movie_camera", "battery", "electric_plug", "satellite", "telescope", "microscope", "pill",
+        "syringe", "dna", "test_tube", "crystal_ball", "8ball", "game_die", "jigsaw", "art", "crown", "gem", "ring",
+        "lipstick", "high_heel", "tshirt", "jeans", "shoe", "eyeglasses", "umbrella", "briefcase", "handbag", "school",
+        "hospital", "bank", "hotel", "church", "mountain", "beach_umbrella", "desert_island", "volcano", "camping",
+        "tent", "stadium", "statue_of_liberty", "moon", "full_moon", "new_moon", "first_quarter_moon", "last_quarter_moon",
+        "crescent_moon", "stars", "milky_way", "comet", "boom", "collision", "dizzy", "sweat_drops", "dash", "ocean",
+        "droplet", "fog", "wind_face", "tornado", "cyclone", "thunder_cloud_and_rain", "zap", "snowman", "fire_engine",
+        "ambulance", "police_car", "taxi", "bus", "truck", "tractor", "rocket", "flying_saucer", "helicopter", "parachute",
+        "ferris_wheel", "roller_coaster", "carousel_horse", "circus_tent", "performing_arts", "ticket", "medal",
+        "first_place_medal", "second_place_medal", "third_place_medal", "checkered_flag", "triangular_flag_on_post",
+        "white_flag", "black_flag", "rainbow_flag", "pirate_flag", "crossed_flags", "us", "gb", "ca", "fr", "de", "jp",
+        "cn", "kr", "in", "br", "mx", "es", "it", "au", "ru", "eu",
+    ]
+    private static let popularity: [String: Int] = {
+        var d: [String: Int] = [:]
+        for (i, n) in popular.enumerated() where d[n] == nil { d[n] = i }
+        return d
+    }()
 
     private static let raw = """
 😀 grinning smile,happy
