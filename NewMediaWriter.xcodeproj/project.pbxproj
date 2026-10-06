@@ -15,6 +15,7 @@
 		26F8D61837628DF6DDE5A92F /* EditorTextView+Cursor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AD20FE3422DE63468B4CCE5 /* EditorTextView+Cursor.swift */; };
 		3CFAC08B9716C97B40067682 /* MarkdownRender.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB96E1EE1DED5511665CC62 /* MarkdownRender.swift */; };
 		4E70B2CC654002DCE0FF7C26 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 857FB0537EBDC2F7E2C27AE6 /* App.swift */; };
+		57C21B903C15556DB2FE76F0 /* ImageDrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4674426A3396B13A0D2970FA /* ImageDrop.swift */; };
 		611671BB524F847BC86C44F8 /* ViewPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EA36ED649646412E20B0090 /* ViewPicker.swift */; };
 		66D2F299DFE145D609C0767C /* XPostFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168669D893552904F2B952F1 /* XPostFeedView.swift */; };
 		69DD07C9ABFD623D17783EF4 /* ImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A8696499D0306F478FB7AE /* ImageCache.swift */; };
@@ -35,6 +36,7 @@
 		D2DBB16239A3A9A5C1CE5201 /* ViewMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6617B82F8B6BBFD62FC09B0A /* ViewMode.swift */; };
 		DA1B82CA834FE5BC35F85BFC /* EmojiPopup.swift in Sources */ = {isa = PBXBuildFile; fileRef = D19B0D3CE1A5864F0977A63F /* EmojiPopup.swift */; };
 		DAC73B4C669553B030AD79B0 /* SlackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DC38351006FCA7CFD14D557 /* SlackView.swift */; };
+		F862E504220920230CC50FDB /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5122C4BFA874706BAC9E7C8 /* UpdateChecker.swift */; };
 		FA2807432B702100ABBC0B7D /* MarkdownStyler.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBD62FA1B583B19444EAD33E /* MarkdownStyler.swift */; };
 /* End PBXBuildFile section */
 
@@ -47,6 +49,7 @@
 		187D0356A57960AC3B94764C /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		2E504E094D246776982204E3 /* EditorTextView+Emoji.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EditorTextView+Emoji.swift"; sourceTree = "<group>"; };
 		36E754FF078AB5AE59A6B3A8 /* Profile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Profile.swift; sourceTree = "<group>"; };
+		4674426A3396B13A0D2970FA /* ImageDrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageDrop.swift; sourceTree = "<group>"; };
 		4DC38351006FCA7CFD14D557 /* SlackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackView.swift; sourceTree = "<group>"; };
 		4FF87C4F669B04A1CE500152 /* Exporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Exporter.swift; sourceTree = "<group>"; };
 		51B35CFC028AB421D205C2A3 /* ViewSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewSwitcher.swift; sourceTree = "<group>"; };
@@ -68,6 +71,7 @@
 		D56F96F403FEB7C209DAB77D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DA89144C3D0FBCC2BC0B0AA9 /* EditorTextView+Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EditorTextView+Formatting.swift"; sourceTree = "<group>"; };
 		DE04E2656851672C8CFEDA1C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		E5122C4BFA874706BAC9E7C8 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		FB150175F3B36C6838690CCF /* LinkedInFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkedInFeedView.swift; sourceTree = "<group>"; };
 		FBD62FA1B583B19444EAD33E /* MarkdownStyler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownStyler.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -104,6 +108,7 @@
 				A1A8696499D0306F478FB7AE /* ImageCache.swift */,
 				36E754FF078AB5AE59A6B3A8 /* Profile.swift */,
 				8547A1C6D6EE887296778369 /* ScrollPassthrough.swift */,
+				E5122C4BFA874706BAC9E7C8 /* UpdateChecker.swift */,
 				6617B82F8B6BBFD62FC09B0A /* ViewMode.swift */,
 			);
 			path = Model;
@@ -155,6 +160,7 @@
 			isa = PBXGroup;
 			children = (
 				187D0356A57960AC3B94764C /* Components.swift */,
+				4674426A3396B13A0D2970FA /* ImageDrop.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -281,6 +287,7 @@
 				DA1B82CA834FE5BC35F85BFC /* EmojiPopup.swift in Sources */,
 				C9348F8F3277E4FA34FCD5C7 /* Exporter.swift in Sources */,
 				69DD07C9ABFD623D17783EF4 /* ImageCache.swift in Sources */,
+				57C21B903C15556DB2FE76F0 /* ImageDrop.swift in Sources */,
 				A3FFBDEABCF714BE3FEAFBEA /* LinkedInFeedView.swift in Sources */,
 				CEA649CE339D954664796073 /* MarkdownDocument.swift in Sources */,
 				09297840DDE50A0AA5166B02 /* MarkdownEditor.swift in Sources */,
@@ -293,6 +300,7 @@
 				C8ACD5416AFBE5CCC0B9E251 /* ScrollPassthrough.swift in Sources */,
 				C76258E2A058AA9F07326448 /* SettingsView.swift in Sources */,
 				DAC73B4C669553B030AD79B0 /* SlackView.swift in Sources */,
+				F862E504220920230CC50FDB /* UpdateChecker.swift in Sources */,
 				D2DBB16239A3A9A5C1CE5201 /* ViewMode.swift in Sources */,
 				611671BB524F847BC86C44F8 /* ViewPicker.swift in Sources */,
 				96FFC8DD3E5717CEE0BDCC09 /* ViewSwitcher.swift in Sources */,

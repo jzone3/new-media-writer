@@ -139,7 +139,7 @@ struct LinkedInPostCard: View {
             header.padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 8)
 
             PostEditor(text: markdown, theme: LinkedInTheme.editorTheme, documentURL: baseURL,
-                       foldAfter: LinkedInTheme.fold, onChange: onEdit)
+                       foldAfter: LinkedInTheme.fold, takesFocusOnAppear: true, onChange: onEdit)
                 .overlay(alignment: .topLeading) {
                     if markdown.isEmpty {
                         Text("What do you want to talk about?")
@@ -159,6 +159,7 @@ struct LinkedInPostCard: View {
         }
         .background(LinkedInTheme.card, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(LinkedInTheme.border))
+        .imageDrop(documentURL: baseURL, markdown: markdown, accent: LinkedInTheme.blue, cornerRadius: 8, onEdit: onEdit)
     }
 
     private var header: some View {

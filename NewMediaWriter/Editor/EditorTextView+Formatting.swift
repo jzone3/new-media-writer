@@ -1,12 +1,13 @@
 import AppKit
 
-/// ⌘B / ⌘I / ⌘E / ⌘K toggle markdown markers around the selection instead of rich-text attributes.
+/// ⌘B / ⌘I / ⌘E / ⇧⌘K toggle markdown markers around the selection instead of rich-text attributes.
 /// All edits go through `insertText(_:replacementRange:)`, which runs shouldChangeText/didChangeText
 /// and registers undo itself; calling shouldChangeText here as well would register the undo twice.
 extension EditorTextView {
     @objc func toggleBoldface(_ sender: Any?) { toggleMarker("**") }
     @objc func toggleItalics(_ sender: Any?) { toggleMarker("*") }
     @objc func toggleInlineCode(_ sender: Any?) { toggleMarker("`") }
+    @objc func toggleStrikethrough(_ sender: Any?) { toggleMarker("~~") }
 
     @objc func insertLink(_ sender: Any?) {
         let sel = selectedRange()

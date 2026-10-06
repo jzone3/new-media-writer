@@ -80,7 +80,8 @@ struct ViewCommands: Commands {
         CommandGroup(replacing: .textFormatting) {
             Button("Bold") { send(Selector(("toggleBoldface:"))) }.keyboardShortcut("b", modifiers: .command)
             Button("Italic") { send(Selector(("toggleItalics:"))) }.keyboardShortcut("i", modifiers: .command)
-            Button("Inline Code") { send(#selector(EditorTextView.toggleInlineCode(_:))) }.keyboardShortcut("e", modifiers: .command)
+            Button("Strikethrough") { send(#selector(EditorTextView.toggleStrikethrough(_:))) }.keyboardShortcut("e", modifiers: .command)
+            Button("Inline Code") { send(#selector(EditorTextView.toggleInlineCode(_:))) }
             Button("Link") { send(#selector(EditorTextView.insertLink(_:))) }.keyboardShortcut("k", modifiers: [.command, .shift])
             Divider()
             Button("Bulleted List") { send(#selector(EditorTextView.toggleBulletedList(_:))) }.keyboardShortcut("u", modifiers: [.command, .option])
@@ -92,6 +93,10 @@ struct ViewCommands: Commands {
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
             .disabled(viewMode == nil)
+        }
+        // There is no help book; the stock item only showed "Help isn't available".
+        CommandGroup(replacing: .help) {
+            Button("New Media Writer Help") { NSWorkspace.shared.open(URL(string: "https://newmediawriter.app/")!) }
         }
     }
 

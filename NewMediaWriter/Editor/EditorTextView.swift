@@ -3,6 +3,13 @@ import UniformTypeIdentifiers
 
 /// NSTextView that keeps a centred reading column, hides markdown syntax away from the cursor,
 /// renders images below their `![]()` line and stores pasted/dropped images in `assets/`.
+/// How the timeline fold is drawn; nil colours fall back to the theme's secondary colour.
+struct FoldMarkerStyle {
+    var label = "…more  ·  fold"
+    var labelColor: NSColor? = nil
+    var lineColor: NSColor? = nil
+}
+
 final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDelegate {
     let emojiPopup = EmojiPopup()
 
@@ -24,21 +31,28 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     }
 
     override func viewWillMove(toWindow newWindow: NSWindow?) {
-        if newWindow == nil { emojiPopup.hide() }
+        if newWindow == nil {
+            emojiPopup.hide()
+            // NSTextView's typing-undo operations keep unretained references to this view and its layout
+            // manager (and are not registered with the view as target), so a ⌘Z after a view switch would
+            // message freed objects. The window is still reachable here: clear the undo stack.
+            undoManager?.removeAllActions()
+            window?.undoManager?.removeAllActions()
+        }
         super.viewWillMove(toWindow: newWindow)
     }
 
-    /// The document editor claims keyboard focus when it appears (new window, view switch) so typing and ⌘V
-    /// work without a click first; embedded feed-card editors leave focus alone.
+    /// The editor claims keyboard focus when it appears (new window, view switch) so typing and ⌘V work without
+    /// a click first. Set on the document editor and on each feed's primary post editor; extra thread posts
+    /// only take it when they were just added.
     var takesFocusOnAppear = false
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         guard takesFocusOnAppear, let window else { return }
         DispatchQueue.main.async { [weak self, weak window] in
-            guard let self, let window, self.window === window else { return }
-            // Another document/card editor keeps focus; a closing ⌘K picker (field editor) does not.
-            if window.firstResponder is EditorTextView { return }
+            // The outgoing view's card editor (or the closing ⌘K picker) may still hold focus here; take it anyway.
+            guard let self, let window, self.window === window, window.firstResponder !== self else { return }
             window.makeFirstResponder(self)
         }
     }
@@ -59,9 +73,10 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     /// Embedded in a feed card: no centred column, text spans the full frame width.
     var fillsWidth = false
     /// Feed cards show media in their own grid, so the editor skips inline image rendering.
-    var showsImages = true
-    /// Draws a dashed "…more" fold line after this many visible (non-marker) characters.
-    var foldAfterVisibleCharacters: Int? { didSet { needsDisplay = true } }
+    var showsImages = true { didSet { styler.revealsBrokenImages = showsImages } }
+    /// Draws a dashed fold line + label after this many visible (non-marker) characters.
+    var foldAfterVisibleCharacters: Int? { didSet { if oldValue != foldAfterVisibleCharacters { relayoutFold() } } }
+    var foldStyle = FoldMarkerStyle() { didSet { if oldValue.label != foldStyle.label { relayoutFold() } else { needsDisplay = true } } }
     /// Embedded editors only reveal syntax in the cursor's paragraph while they have keyboard focus.
     var revealsMarkersOnlyWhenFocused = false
 
@@ -131,6 +146,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         minSize = NSSize(width: 0, height: 0)
         maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         styler.imageHeight = { [weak self] path in self?.displayHeight(forImagePath: path) ?? 0 }
+        styler.revealsBrokenImages = showsImages
     }
 
     // MARK: - Column layout
@@ -171,7 +187,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         super.didChangeText()
         if let textStorage { styler.restyle(textStorage) }
         updateActiveParagraph(invalidate: true)
-        if foldAfterVisibleCharacters != nil { needsDisplay = true }
+        if foldAfterVisibleCharacters != nil { relayoutMovedFold() }
         needsImageLayout = true
         // Deferred: the popup queries layout, which must not happen while the edit is still being processed.
         DispatchQueue.main.async { [weak self] in self?.layoutImages(); self?.updateEmojiSuggestions() }
@@ -210,6 +226,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         guard clamped.length > 0 else { return }
         layoutManager.invalidateGlyphs(forCharacterRange: clamped, changeInLength: 0, actualCharacterRange: nil)
         layoutManager.invalidateLayout(forCharacterRange: clamped, actualCharacterRange: nil)
+        layoutManager.invalidateDisplay(forCharacterRange: clamped)
     }
 
     private func invalidateAllGlyphs() {
@@ -328,33 +345,78 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         }
     }
 
-    // MARK: - Fold marker (LinkedIn "…more")
+    // MARK: - Fold marker (LinkedIn "…more", X "Show more")
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         drawFoldMarker()
     }
 
-    private static let foldLabel = "…more  ·  fold" as NSString
+    private var foldLabel: NSString { foldStyle.label as NSString }
     private var foldLabelAttributes: [NSAttributedString.Key: Any] {
-        [.font: NSFont.systemFont(ofSize: 10, weight: .semibold), .foregroundColor: styler.theme.secondary]
+        [.font: NSFont.systemFont(ofSize: 10, weight: .semibold),
+         .foregroundColor: foldStyle.labelColor ?? styler.theme.secondary]
     }
 
-    /// Character index where the fold falls, if the text runs past `foldAfterVisibleCharacters`.
+    /// Index of the last character shown above the fold, if the text runs past `foldAfterVisibleCharacters`.
     private func foldCharacterIndex() -> Int? {
+        if let cached = foldIndexCache { return cached }
+        let index = computeFoldCharacterIndex()
+        foldIndexCache = .some(index)
+        return index
+    }
+
+    private var foldIndexCache: Int?? = nil
+
+    private func computeFoldCharacterIndex() -> Int? {
         guard let fold = foldAfterVisibleCharacters, fold > 0, let textStorage, textStorage.length > 0 else { return nil }
         var visible = 0
+        var lastShown: Int?
         var i = 0
         while i < textStorage.length {
             var effective = NSRange()
             let isMarker = textStorage.attribute(.mdMarker, at: i, effectiveRange: &effective) != nil
             if !isMarker {
-                if visible + effective.length > fold { return i + (fold - visible) }
+                if lastShown == nil, visible + effective.length >= fold { lastShown = i + (fold - visible) - 1 }
                 visible += effective.length
             }
             i = effective.location + effective.length
         }
-        return nil
+        return visible > fold ? lastShown : nil
+    }
+
+    /// Height reserved below the folded line for the dashed rule and its label.
+    private var foldMarkerHeight: CGFloat { 6 + foldLabel.size(withAttributes: foldLabelAttributes).height }
+
+    /// The folded line gets extra height so the marker sits between lines instead of over the next one.
+    func layoutManager(_ layoutManager: NSLayoutManager, shouldSetLineFragmentRect lineFragmentRect: UnsafeMutablePointer<NSRect>, lineFragmentUsedRect: UnsafeMutablePointer<NSRect>, baselineOffset: UnsafeMutablePointer<CGFloat>, in textContainer: NSTextContainer, forGlyphRange glyphRange: NSRange) -> Bool {
+        guard let foldIndex = foldCharacterIndex() else { return false }
+        let chars = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+        guard NSLocationInRange(foldIndex, chars) else { return false }
+        lineFragmentRect.pointee.size.height += foldMarkerHeight
+        return true
+    }
+
+    /// Fold settings changed: every line may gain or lose the marker's height.
+    private func relayoutFold() {
+        foldIndexCache = nil
+        needsDisplay = true
+        guard let layoutManager, let textStorage, textStorage.length > 0 else { return }
+        layoutManager.invalidateLayout(forCharacterRange: NSRange(location: 0, length: textStorage.length), actualCharacterRange: nil)
+    }
+
+    /// After an edit the fold may sit on a different line; relayout both so only the new one carries the extra height.
+    private func relayoutMovedFold() {
+        guard let layoutManager, let textStorage else { return }
+        let old = foldIndexCache ?? nil
+        foldIndexCache = nil
+        let new = foldCharacterIndex()
+        needsDisplay = true
+        guard old != new else { return }
+        let string = textStorage.string as NSString
+        for index in [old, new].compactMap({ $0 }) where index < string.length {
+            layoutManager.invalidateLayout(forCharacterRange: string.paragraphRange(for: NSRange(location: index, length: 0)), actualCharacterRange: nil)
+        }
     }
 
     /// Bottom edge of the fold label in text-container coordinates, so hosts sizing to content can reserve room for it.
@@ -362,7 +424,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         guard let layoutManager, let foldIndex = foldCharacterIndex() else { return nil }
         let glyph = layoutManager.glyphIndexForCharacter(at: foldIndex)
         let line = layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
-        return line.maxY + 4 + Self.foldLabel.size(withAttributes: foldLabelAttributes).height
+        return line.maxY + 4 + foldLabel.size(withAttributes: foldLabelAttributes).height
     }
 
     private func drawFoldMarker() {
@@ -380,12 +442,12 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         path.line(to: NSPoint(x: origin.x + width, y: y))
         path.lineWidth = 1
         path.setLineDash([4, 4], count: 2, phase: 0)
-        styler.theme.secondary.withAlphaComponent(0.7).setStroke()
+        (foldStyle.lineColor ?? styler.theme.secondary.withAlphaComponent(0.7)).setStroke()
         path.stroke()
 
         let attrs = foldLabelAttributes
-        let size = Self.foldLabel.size(withAttributes: attrs)
-        Self.foldLabel.draw(at: NSPoint(x: origin.x + width - size.width, y: y + 2), withAttributes: attrs)
+        let size = foldLabel.size(withAttributes: attrs)
+        foldLabel.draw(at: NSPoint(x: origin.x + width - size.width, y: y + 2), withAttributes: attrs)
     }
 
     // MARK: - Images
@@ -407,6 +469,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     func restyleAndRelayout() {
         guard let textStorage else { return }
         styler.restyle(textStorage)
+        foldIndexCache = nil
         needsImageLayout = true
         layoutImages()
     }
@@ -479,11 +542,18 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         [.fileURL, .png, .tiff, .string]
     }
 
+    /// Feed cards take image drops anywhere on the card, so their editors only accept text drags.
+    var acceptsImageDrops = true { didSet { updateDragTypeRegistration() } }
+
     override var acceptableDragTypes: [NSPasteboard.PasteboardType] {
-        [.fileURL, .png, .tiff, .string]
+        acceptsImageDrops ? [.fileURL, .png, .tiff, .string] : [.string]
     }
 
     override func readSelection(from pboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
+        // A drag carrying both text and an image still reaches a card editor; append the image like the card does.
+        if !acceptsImageDrops, ImageStore.hasImages(on: pboard) {
+            setSelectedRange(NSRange(location: (string as NSString).length, length: 0))
+        }
         if insertImages(from: pboard) { return true }
         if type == .string, let s = pboard.string(forType: .string) {
             insertText(s, replacementRange: selectedRange())
@@ -504,21 +574,12 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     @discardableResult
     private func insertImages(from pboard: NSPasteboard) -> Bool {
-        let store = ImageStore(documentURL: documentURL)
-        var paths: [String] = []
-
-        if let urls = pboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
-            for url in urls {
-                guard let type = UTType(filenameExtension: url.pathExtension), type.conforms(to: .image) else { return false }
-                if let p = try? store.store(fileURL: url) { paths.append(p) }
-            }
-        } else if let data = pboard.data(forType: .png) {
-            if let p = try? store.store(data: data, preferredName: Self.timestampName(), ext: "png") { paths.append(p) }
-        } else if let data = pboard.data(forType: .tiff), let rep = NSBitmapImageRep(data: data), let png = rep.representation(using: .png, properties: [:]) {
-            if let p = try? store.store(data: png, preferredName: Self.timestampName(), ext: "png") { paths.append(p) }
+        guard ImageStore.hasImages(on: pboard) else { return false }
+        guard let documentURL else {
+            ImageStore.promptToSave(in: window)
+            return true
         }
-
-        guard !paths.isEmpty else { return false }
+        guard let paths = ImageStore(documentURL: documentURL).storeImages(from: pboard) else { return false }
         insertImageMarkdown(paths: paths)
         return true
     }
@@ -528,21 +589,10 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         let sel = selectedRange()
         var prefix = ""
         if sel.location > 0, string.character(at: sel.location - 1) != 10 { prefix = "\n" }
-        let lines = paths.map { path -> String in
-            let name = (path as NSString).lastPathComponent
-            let alt = ((name.removingPercentEncoding ?? name) as NSString).deletingPathExtension
-            return "![\(alt)](\(path))"
-        }
         var suffix = "\n"
         if sel.location + sel.length < string.length, string.character(at: sel.location + sel.length) == 10 { suffix = "" }
-        insertText(prefix + lines.joined(separator: "\n") + suffix, replacementRange: sel)
+        insertText(prefix + ImageStore.markdown(for: paths) + suffix, replacementRange: sel)
         onImageInserted?()
-    }
-
-    private static func timestampName() -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd-HHmmss"
-        return "image-" + f.string(from: Date())
     }
 }
 

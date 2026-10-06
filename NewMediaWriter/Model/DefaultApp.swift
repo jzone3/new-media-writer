@@ -2,7 +2,8 @@ import AppKit
 import UniformTypeIdentifiers
 
 enum DefaultApp {
-    static let promptedKey = "defaultAppPrompted"
+    // Bumped when the prompt was unreachable in shipped builds (hidden behind the launch Open panel), so those users get asked once.
+    static let promptedKey = "defaultAppPrompted.2"
     static let markdown = UTType(importedAs: "net.daringfireball.markdown", conformingTo: .plainText)
 
     /// True when running from a mounted disk image or an App Translocation
@@ -42,9 +43,26 @@ enum DefaultApp {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Dock click with no windows open: a new Untitled document instead of DocumentGroup's Open panel.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        guard !hasVisibleWindows else { return true }
+        NSDocumentController.shared.newDocument(nil)
+        return false
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+        // DocumentGroup opens its Open panel when launched with nothing to open (and ignores
+        // applicationShouldOpenUntitledFile). Swap that launch panel for an Untitled document; a
+        // launch with a file never shows the panel, so nothing happens then.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            guard NSDocumentController.shared.documents.isEmpty,
+                  let panel = NSApp.windows.first(where: { $0 is NSOpenPanel }) as? NSOpenPanel else { return }
+            panel.cancel(nil)
+            NSDocumentController.shared.newDocument(nil)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             DefaultApp.promptIfNeeded()
         }
+        UpdateChecker.shared.checkOnLaunch()
     }
 }

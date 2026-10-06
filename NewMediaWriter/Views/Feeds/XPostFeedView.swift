@@ -6,6 +6,10 @@ enum XTheme {
     static let secondary = Color.adaptive(light: 0x536471, dark: 0x71767B)
     static let border = Color.adaptive(light: 0xEFF3F4, dark: 0x2F3336)
     static let limit = 25_000
+    /// x.com truncates long (Premium) posts in the timeline after roughly this many characters.
+    static let fold = 280
+    static let foldStyle = FoldMarkerStyle(label: "Show more", labelColor: NSColor(blue),
+                                           lineColor: .adaptive(light: 0xEFF3F4, dark: 0x2F3336))
     static let columnWidth: CGFloat = 600
 
     static let editorTheme = EditorTheme.post(
@@ -23,8 +27,9 @@ struct XPostFeedView: View {
     let profile: Profile
 
     private var text: String { document.text }
-    private var thread: [MarkdownParser.ThreadSegment] { MarkdownParser.thread(text) }
+    private var thread: [MarkdownParser.ThreadSegment] { MarkdownParser.thread(text, keepTrailingEmpty: true) }
     private var segments: [String] { thread.map(\.text) }
+    @State private var focusedNewPost: Int?
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -35,8 +40,10 @@ struct XPostFeedView: View {
                     ForEach(Array(thread.enumerated()), id: \.offset) { i, segment in
                         XPostCell(markdown: segment.text, baseURL: baseURL, profile: profile,
                                   isThread: thread.count > 1, isLast: i == thread.count - 1, index: i,
-                                  onEdit: { replace(segment, at: i, with: $0) })
+                                  takesFocus: focusedNewPost == i || (focusedNewPost == nil && i == 0),
+                                  onEdit: { replace(at: i, with: $0) })
                     }
+                    addToThreadRow
                     ghostPost(seed: 1)
                     ghostPost(seed: 2)
                     ghostPost(seed: 3)
@@ -50,20 +57,57 @@ struct XPostFeedView: View {
 
             HStack(spacing: 8) {
                 CopyButton(payload: { Exporter.xThread(text) }, alternatives: copyAlternatives)
-                CharacterBadge(count: totalCount, limit: XTheme.limit,
+                CharacterBadge(count: longestPostCount, limit: XTheme.limit,
                                detail: segments.count > 1 ? "\(segments.count) posts" : nil)
             }
             .padding(16)
         }
     }
 
+    private var addToThreadRow: some View {
+        Button {
+            let trimmed = text.replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression)
+            focusedNewPost = thread.count
+            document.text = trimmed.isEmpty ? "\n\n---\n\n" : trimmed + "\n\n---\n\n"
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "plus.circle")
+                    .font(.system(size: 20, weight: .light))
+                    .frame(width: 40)
+                Text("Add another post")
+                    .font(.system(size: 15))
+                Spacer()
+            }
+            .foregroundStyle(XTheme.blue)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Add a post to the thread (inserts a --- separator)")
+        .overlay(alignment: .bottom) { XTheme.border.frame(height: 1) }
+    }
+
     /// Writes an edited post back into its slice of the document, keeping the `---` separators padded.
-    private func replace(_ segment: MarkdownParser.ThreadSegment, at index: Int, with edited: String) {
+    /// Segments are re-parsed here: keystrokes can arrive faster than SwiftUI re-renders the cards.
+    private func replace(at index: Int, with edited: String) {
         let ns = document.text as NSString
+        let thread = MarkdownParser.thread(document.text, keepTrailingEmpty: true)
+        guard index < thread.count else { return }
+        let segment = thread[index]
         guard NSMaxRange(segment.range) <= ns.length else { return }
+        // Keep the blank lines that padded this post around its `---` separators.
+        let original = ns.substring(with: segment.range)
         var replacement = edited
-        if index > 0, !replacement.hasPrefix("\n") { replacement = "\n" + replacement }
-        if index < thread.count - 1, !replacement.hasSuffix("\n") { replacement += "\n" }
+        if index > 0 {
+            let lead = String(original.prefix { $0 == "\n" })
+            replacement = (lead.isEmpty ? "\n" : lead) + replacement.drop { $0 == "\n" }
+        }
+        if index < thread.count - 1 {
+            let trail = String(original.reversed().prefix { $0 == "\n" })
+            let body = String(replacement.reversed().drop { $0 == "\n" }.reversed())
+            replacement = body + (trail.isEmpty ? "\n" : trail)
+        }
         document.text = ns.replacingCharacters(in: segment.range, with: replacement)
     }
 
@@ -75,8 +119,8 @@ struct XPostFeedView: View {
         }
     }
 
-    private var totalCount: Int {
-        segments.map { String(MarkdownRender.xAttributed($0).characters).count }.reduce(0, +)
+    private var longestPostCount: Int {
+        segments.map { MarkdownRender.xCount(String(MarkdownRender.xAttributed($0).characters)) }.max() ?? 0
     }
 
     private var header: some View {
@@ -142,6 +186,7 @@ struct XPostCell: View {
     var isThread = false
     var isLast = true
     var index = 0
+    var takesFocus = false
     var onEdit: (String) -> Void = { _ in }
     @State private var copied = false
 
@@ -176,14 +221,34 @@ struct XPostCell: View {
                             .buttonStyle(.plain)
                             .help("Copy post \(index + 1)")
                         }
-                        Image(systemName: "ellipsis").foregroundStyle(XTheme.secondary)
+                        Menu {
+                            Button("Copy") {
+                                Exporter.xPost(markdown).copy()
+                                copied = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
+                            }
+                            Button("Follow me") {
+                                NSWorkspace.shared.open(URL(string: "https://x.com/imjaredz")!)
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .foregroundStyle(XTheme.secondary)
+                                .frame(width: 24, height: 20)
+                                .contentShape(Rectangle())
+                        }
+                        .menuStyle(.button)
+                        .buttonStyle(.plain)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
                     }
                     .font(.system(size: 15))
 
-                    PostEditor(text: markdown, theme: XTheme.editorTheme, documentURL: baseURL, onChange: onEdit)
+                    PostEditor(text: markdown, theme: XTheme.editorTheme, documentURL: baseURL,
+                               foldAfter: XTheme.fold, foldStyle: XTheme.foldStyle,
+                               takesFocusOnAppear: takesFocus, onChange: onEdit)
                         .overlay(alignment: .topLeading) {
                             if markdown.isEmpty {
-                                Text(index == 0 ? "What is happening?!" : "Add another post…")
+                                Text(index == 0 ? "What is happening?!" : "Post \(index + 1)…")
                                     .font(.system(size: 15)).foregroundStyle(XTheme.secondary)
                                     .allowsHitTesting(false)
                             }
@@ -215,6 +280,7 @@ struct XPostCell: View {
             }
         }
         .background(Color.clear)
+        .imageDrop(documentURL: baseURL, markdown: markdown, accent: XTheme.blue, onEdit: onEdit)
     }
 
     private var actionBar: some View {

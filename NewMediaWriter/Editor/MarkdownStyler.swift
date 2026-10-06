@@ -78,10 +78,13 @@ final class MarkdownStyler {
     var raw = false
     /// Returns the display height for an image path given the current column width.
     var imageHeight: (String) -> CGFloat = { _ in 0 }
+    /// Document editor only: a local image that fails to load keeps its source line visible.
+    var revealsBrokenImages = false
 
     private static let inlineCode = try! NSRegularExpression(pattern: "`([^`\\n]+)`")
+    private static let boldItalic = try! NSRegularExpression(pattern: "(\\*\\*\\*|___)(?=\\S)(.+?)(?<=\\S)\\1")
     private static let bold = try! NSRegularExpression(pattern: "(\\*\\*|__)(?=\\S)(.+?)(?<=\\S)\\1")
-    private static let italic = try! NSRegularExpression(pattern: "(?<![\\w*_])(\\*|_)(?=\\S)([^*_\\n]+?)(?<=\\S)\\1(?![\\w*_])")
+    private static let italic = try! NSRegularExpression(pattern: "(?<![\\w*_])(\\*|_)(?=\\S)([^*_\\n]+?)(?<=\\S)\\1(?!\\w)")
     private static let strike = try! NSRegularExpression(pattern: "~~(?=\\S)(.+?)(?<=\\S)~~")
     private static let link = try! NSRegularExpression(pattern: "(?<!!)\\[([^\\]\\n]+)\\]\\(([^)\\n]+)\\)")
     private static let inlineImage = MarkdownParser.imageRegex
@@ -154,11 +157,11 @@ final class MarkdownStyler {
         if MarkdownParser.isRule(trimmed) || trimmed.hasPrefix(">") {
             apply(storage, range, font: theme.mono, color: theme.secondary)
         }
-        for regex in [Self.inlineCode, Self.bold, Self.italic, Self.strike, Self.link, Self.inlineImage] {
+        for regex in [Self.inlineCode, Self.boldItalic, Self.bold, Self.italic, Self.strike, Self.link, Self.inlineImage] {
             regex.enumerateMatches(in: storage.string, range: range) { m, _, _ in
                 guard let m else { return }
                 let r = m.range
-                if regex === Self.bold {
+                if regex === Self.bold || regex === Self.boldItalic {
                     storage.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: self.theme.body.pointSize, weight: .bold), range: r)
                 } else if regex === Self.link || regex === Self.inlineImage {
                     storage.addAttribute(.foregroundColor, value: self.theme.accent, range: m.range(at: regex === Self.link ? 2 : 2))
@@ -202,9 +205,11 @@ final class MarkdownStyler {
 
         if let img = MarkdownParser.standaloneImage(trimmed) {
             apply(storage, range, font: theme.mono.withSize(12), color: theme.secondary)
-            hiddenLine(storage, range)
-            storage.addAttribute(.mdImage, value: img.path, range: range)
             let h = imageHeight(img.path)
+            // A local file that failed to load keeps its source line visible instead of vanishing silently.
+            let isRemote = img.path.hasPrefix("http://") || img.path.hasPrefix("https://")
+            if h > 0 || isRemote || !revealsBrokenImages { hiddenLine(storage, range) }
+            storage.addAttribute(.mdImage, value: img.path, range: range)
             paragraph(storage, range) { p in
                 p.paragraphSpacing = h + 16
                 p.lineHeightMultiple = 1.2
@@ -217,7 +222,14 @@ final class MarkdownStyler {
             if trimmed.count > 1, trimmed[trimmed.index(after: trimmed.startIndex)] == " " { markerLen = 2 }
             marker(storage, NSRange(location: range.location + leading, length: min(markerLen, range.length - leading)))
             storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: range)
-            storage.addAttribute(.mdQuote, value: true, range: range)
+            // Starts after the (hidden) marker: a zero-width glyph at the paragraph start is laid out on the
+            // previous line, which drags the quote bar one line up.
+            // An empty `>` line has nothing after the marker, so the bar is hung on its newline instead.
+            let markerEnd = min(range.location + leading + markerLen, NSMaxRange(range))
+            let quoteLength = min(max(NSMaxRange(range) - markerEnd, 1), storage.length - markerEnd)
+            if quoteLength > 0 {
+                storage.addAttribute(.mdQuote, value: true, range: NSRange(location: markerEnd, length: quoteLength))
+            }
             paragraph(storage, range) { p in
                 p.headIndent = 22
                 p.firstLineHeadIndent = 22
@@ -260,15 +272,29 @@ final class MarkdownStyler {
             storage.addAttribute(.mdCodeBackground, value: true, range: m.range(at: 1))
         }
 
-        Self.bold.enumerateMatches(in: text, range: range) { m, _, _ in
+        var boldItalicRanges: [NSRange] = []
+        Self.boldItalic.enumerateMatches(in: text, range: range) { m, _, _ in
             guard let m else { return }
+            boldItalicRanges.append(m.range)
+            self.marker(storage, NSRange(location: m.range.location, length: 3))
+            self.marker(storage, NSRange(location: m.range.location + m.range.length - 3, length: 3))
+            self.addTrait(storage, m.range(at: 2), trait: .boldFontMask)
+            self.addTrait(storage, m.range(at: 2), trait: .italicFontMask)
+        }
+        // `***x***` also matches the bold regex (as `**` + `*x` + `**`); leave those to the pass above.
+        func insideBoldItalic(_ r: NSRange) -> Bool {
+            boldItalicRanges.contains { NSIntersectionRange($0, r).length > 0 }
+        }
+
+        Self.bold.enumerateMatches(in: text, range: range) { m, _, _ in
+            guard let m, !insideBoldItalic(m.range) else { return }
             self.marker(storage, NSRange(location: m.range.location, length: 2))
             self.marker(storage, NSRange(location: m.range.location + m.range.length - 2, length: 2))
             self.addTrait(storage, m.range(at: 2), trait: .boldFontMask)
         }
 
         Self.italic.enumerateMatches(in: text, range: range) { m, _, _ in
-            guard let m else { return }
+            guard let m, !insideBoldItalic(m.range) else { return }
             self.marker(storage, NSRange(location: m.range.location, length: 1))
             self.marker(storage, NSRange(location: m.range.location + m.range.length - 1, length: 1))
             self.addTrait(storage, m.range(at: 2), trait: .italicFontMask)

@@ -18,10 +18,50 @@ enum MarkdownInline {
         String(attributed(text).characters)
     }
 
+    /// Like `attributed`, but `[title](url)` becomes "title (url)" so the destination survives
+    /// on services that render plain text.
+    static func attributedExposingLinks(_ text: String) -> AttributedString {
+        let source = attributed(text)
+        var out = AttributedString()
+        var linkText = ""
+        let runs = Array(source.runs)
+        for (i, run) in runs.enumerated() {
+            var piece = AttributedString(source[run.range])
+            if let link = run.link {
+                // A label with inline formatting spans several runs; append the URL once, after the last.
+                linkText += String(piece.characters)
+                let next = i + 1 < runs.count ? runs[i + 1].link : nil
+                if next != link {
+                    if !isBareURL(linkText, link) {
+                        piece += AttributedString(" (\(link.absoluteString))")
+                    }
+                    linkText = ""
+                }
+                piece.link = nil
+            }
+            out += piece
+        }
+        return out
+    }
+
+    /// Plain text where links keep their URL.
+    static func plainExposingLinks(_ text: String) -> String {
+        String(attributedExposingLinks(text).characters)
+    }
+
+    /// True when the visible text already is the URL (autolinked bare URL).
+    static func isBareURL(_ shown: String, _ link: URL) -> Bool {
+        let a = shown.trimmingCharacters(in: .whitespaces)
+        let b = link.absoluteString
+        return a == b || a + "/" == b || a == b + "/"
+    }
+
     static func stripImages(_ text: String) -> String {
         let ns = NSMutableString(string: text)
         MarkdownParser.imageRegex.replaceMatches(in: ns, range: NSRange(location: 0, length: ns.length), withTemplate: "")
-        return (ns as String).replacingOccurrences(of: "\n\n\n", with: "\n\n")
+        return (ns as String)
+            .replacingOccurrences(of: "\n\n\n", with: "\n\n")
+            .replacingOccurrences(of: "[ \\t]+\n", with: "\n", options: .regularExpression)
     }
 }
 
