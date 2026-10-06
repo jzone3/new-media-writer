@@ -252,7 +252,8 @@ struct XPostCell: View {
                                takesFocusOnAppear: takesFocus, onChange: onEdit)
 
                     if !images.isEmpty {
-                        MediaGrid(urls: images, cornerRadius: 16)
+                        MediaGrid(urls: images, cornerRadius: 16,
+                                  onRemove: { onEdit(MarkdownParser.removingImage(at: $0, from: markdown)) })
                             .padding(.top, 4)
                     }
 

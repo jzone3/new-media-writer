@@ -581,7 +581,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     override func readSelection(from pboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
         // A drag carrying both text and an image still reaches a card editor; append the image like the card does.
-        if !acceptsImageDrops, ImageStore.hasImages(on: pboard) {
+        if !acceptsImageDrops, ImageStore.hasMedia(on: pboard) {
             setSelectedRange(NSRange(location: (string as NSString).length, length: 0))
         }
         if insertImages(from: pboard) { return true }
@@ -638,12 +638,12 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     @discardableResult
     private func insertImages(from pboard: NSPasteboard) -> Bool {
-        guard ImageStore.hasImages(on: pboard) else { return false }
+        guard ImageStore.hasMedia(on: pboard) else { return false }
         guard let documentURL else {
             ImageStore.promptToSave(in: window)
             return true
         }
-        guard let paths = ImageStore(documentURL: documentURL).storeImages(from: pboard) else { return false }
+        guard let paths = ImageStore(documentURL: documentURL).storeMedia(from: pboard) else { return false }
         insertImageMarkdown(paths: paths)
         return true
     }

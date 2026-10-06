@@ -150,7 +150,8 @@ struct LinkedInPostCard: View {
                 .padding(.horizontal, 16).padding(.bottom, 12)
 
             if !images.isEmpty {
-                MediaGrid(urls: images, cornerRadius: 0, singleAspect: nil, showsBorder: false)
+                MediaGrid(urls: images, cornerRadius: 0, singleAspect: nil, showsBorder: false,
+                          onRemove: { onEdit(MarkdownParser.removingImage(at: $0, from: markdown)) })
             }
 
             socialCounts.padding(.horizontal, 16).padding(.vertical, 8)
