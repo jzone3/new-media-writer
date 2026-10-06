@@ -64,7 +64,7 @@ from Xcode.
 | Copy for current view | ⇧⌘C |
 | Bold / Italic / Strikethrough (toggle `**` / `*` / `~~` around the selection) | ⌘B / ⌘I / ⌘E |
 | Switch view by typing its name (e.g. "sl" → Slack) | ⌘K |
-| Previous / next view | ⌘← / ⌘→ (also ⌥⌘← / ⌥⌘→) |
+| Previous / next view | ⌥⌘← / ⌥⌘→ |
 | Insert link (uses a URL from the clipboard if there is one) | ⇧⌘K |
 | Bulleted / numbered list (Enter continues a list, Enter on an empty item ends it) | ⌥⌘U / ⌥⌘O |
 

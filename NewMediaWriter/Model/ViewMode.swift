@@ -77,10 +77,10 @@ struct ViewCommands: Commands {
                 .keyboardShortcut("k", modifiers: .command)
                 .disabled(viewPickerShown == nil)
             Button("Previous View") { step(-1) }
-                .keyboardShortcut(.leftArrow, modifiers: .command)
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
                 .disabled(viewMode == nil)
             Button("Next View") { step(1) }
-                .keyboardShortcut(.rightArrow, modifiers: .command)
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
                 .disabled(viewMode == nil)
         }
         CommandGroup(replacing: .textFormatting) {
