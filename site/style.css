@@ -232,3 +232,6 @@ footer a:hover{color:var(--ink)}
 .view-slack .sl-msg .post-text{font-size:14.5px;line-height:1.42}
 .view-slack .sl-msg .post-text p{margin-bottom:9px}
 .view-slack .sl-reacts{margin-top:6px}
+
+/* LinkedIn has no inline formatting: markers hide, text stays regular (matches the app + Copy). */
+.view-li [data-live="post"] b, .view-li [data-live="post"] i { font-weight: 400; font-style: normal; }

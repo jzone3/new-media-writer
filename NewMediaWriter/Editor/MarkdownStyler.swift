@@ -24,6 +24,8 @@ struct EditorTheme {
     var lineHeightMultiple: CGFloat
     var paragraphSpacing: CGFloat = 10
     var headingFontOverride: ((Int) -> NSFont)? = nil
+    /// False for platforms with no inline formatting (LinkedIn): markers still hide, but bold/italic/strike/code stay regular text.
+    var rendersEmphasis = true
 
     static let wysiwyg = EditorTheme(
         body: .systemFont(ofSize: 17, weight: .regular),
@@ -268,6 +270,7 @@ final class MarkdownStyler {
             guard let m else { return }
             self.marker(storage, NSRange(location: m.range.location, length: 1))
             self.marker(storage, NSRange(location: m.range.location + m.range.length - 1, length: 1))
+            guard self.theme.rendersEmphasis else { return }
             storage.addAttribute(.font, value: self.theme.mono, range: m.range(at: 1))
             storage.addAttribute(.mdCodeBackground, value: true, range: m.range(at: 1))
         }
@@ -278,8 +281,10 @@ final class MarkdownStyler {
             boldItalicRanges.append(m.range)
             self.marker(storage, NSRange(location: m.range.location, length: 3))
             self.marker(storage, NSRange(location: m.range.location + m.range.length - 3, length: 3))
-            self.addTrait(storage, m.range(at: 2), trait: .boldFontMask)
-            self.addTrait(storage, m.range(at: 2), trait: .italicFontMask)
+            if self.theme.rendersEmphasis {
+                self.addTrait(storage, m.range(at: 2), trait: .boldFontMask)
+                self.addTrait(storage, m.range(at: 2), trait: .italicFontMask)
+            }
         }
         // `***x***` also matches the bold regex (as `**` + `*x` + `**`); leave those to the pass above.
         func insideBoldItalic(_ r: NSRange) -> Bool {
@@ -290,20 +295,21 @@ final class MarkdownStyler {
             guard let m, !insideBoldItalic(m.range) else { return }
             self.marker(storage, NSRange(location: m.range.location, length: 2))
             self.marker(storage, NSRange(location: m.range.location + m.range.length - 2, length: 2))
-            self.addTrait(storage, m.range(at: 2), trait: .boldFontMask)
+            if self.theme.rendersEmphasis { self.addTrait(storage, m.range(at: 2), trait: .boldFontMask) }
         }
 
         Self.italic.enumerateMatches(in: text, range: range) { m, _, _ in
             guard let m, !insideBoldItalic(m.range) else { return }
             self.marker(storage, NSRange(location: m.range.location, length: 1))
             self.marker(storage, NSRange(location: m.range.location + m.range.length - 1, length: 1))
-            self.addTrait(storage, m.range(at: 2), trait: .italicFontMask)
+            if self.theme.rendersEmphasis { self.addTrait(storage, m.range(at: 2), trait: .italicFontMask) }
         }
 
         Self.strike.enumerateMatches(in: text, range: range) { m, _, _ in
             guard let m else { return }
             self.marker(storage, NSRange(location: m.range.location, length: 2))
             self.marker(storage, NSRange(location: m.range.location + m.range.length - 2, length: 2))
+            guard self.theme.rendersEmphasis else { return }
             storage.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: m.range(at: 1))
             storage.addAttribute(.foregroundColor, value: self.theme.secondary, range: m.range(at: 1))
         }
