@@ -33,10 +33,11 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     override func viewWillMove(toWindow newWindow: NSWindow?) {
         if newWindow == nil {
             emojiPopup.hide()
-            // NSTextView registers its typing undo with itself as the unretained target. The window (and
-            // its undo manager) is still reachable here, so drop those actions before the view is freed.
-            undoManager?.removeAllActions(withTarget: self)
-            window?.undoManager?.removeAllActions(withTarget: self)
+            // NSTextView's typing-undo operations keep unretained references to this view and its layout
+            // manager (and are not registered with the view as target), so a ⌘Z after a view switch would
+            // message freed objects. The window is still reachable here: clear the undo stack.
+            undoManager?.removeAllActions()
+            window?.undoManager?.removeAllActions()
         }
         super.viewWillMove(toWindow: newWindow)
     }
