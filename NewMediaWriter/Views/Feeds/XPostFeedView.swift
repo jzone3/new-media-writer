@@ -68,8 +68,10 @@ struct XPostFeedView: View {
     private var addToThreadRow: some View {
         Button {
             let trimmed = text.replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression)
+            // An empty thread has nothing to split; a lone `---` would just render inside the first post.
+            guard !trimmed.isEmpty else { focusedNewPost = 0; return }
             focusedNewPost = thread.count
-            document.text = trimmed.isEmpty ? "\n\n---\n\n" : trimmed + "\n\n---\n\n"
+            document.text = trimmed + "\n\n---\n\n"
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "plus.circle")
