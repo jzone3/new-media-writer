@@ -259,9 +259,23 @@ extension View {
         onContinuousHover { phase in
             switch phase {
             case .active: NSCursor.pointingHand.set()
-            case .ended: NSCursor.arrow.set()
+            case .ended: NSCursor.underMouse.set()
             }
         }
+    }
+}
+
+private extension NSCursor {
+    /// Arrow, or I-beam when leaving a control straight into editable text.
+    static var underMouse: NSCursor {
+        guard let window = NSApp.keyWindow, let content = window.contentView else { return .arrow }
+        let point = content.convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+        var view = content.hitTest(point)
+        while let v = view {
+            if let text = v as? NSTextView { return text.isEditable ? .iBeam : .arrow }
+            view = v.superview
+        }
+        return .arrow
     }
 }
 

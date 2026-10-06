@@ -19,7 +19,7 @@ extension EditorTextView {
         if overOverlay {
             // Clickable chrome (Copy, menus) sets the pointing hand itself; don't flatten it to the arrow.
             if NSCursor.current != NSCursor.pointingHand { NSCursor.arrow.set() }
-        } else if NSCursor.current == NSCursor.arrow {
+        } else if NSCursor.current == NSCursor.arrow || NSCursor.current == NSCursor.pointingHand {
             NSCursor.iBeam.set()
         }
         return overOverlay
