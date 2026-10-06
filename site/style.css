@@ -34,8 +34,8 @@ h1.script .l2{font-size:clamp(26px,7.8vw,60px);font-weight:700;margin-top:-.1em;
 
 /* ---------- demo window ---------- */
 .demo{max-width:1100px;margin:0 auto;padding:0 28px}
-.window-scale{width:100%;max-width:960px;margin:0 auto;aspect-ratio:960/600;position:relative}
-.window{position:absolute;left:0;top:0;width:960px;height:600px;transform-origin:0 0;background:#fff;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 30px 80px -20px rgba(0,0,0,.25),0 10px 30px -10px rgba(0,0,0,.12);overflow:hidden;user-select:none}
+.window-scale{--win-w:960;--win-h:600;width:100%;max-width:960px;margin:0 auto;aspect-ratio:960/600;position:relative}
+.window{position:absolute;left:0;top:0;width:calc(var(--win-w) * 1px);height:calc(var(--win-h) * 1px);transform-origin:0 0;background:#fff;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 30px 80px -20px rgba(0,0,0,.25),0 10px 30px -10px rgba(0,0,0,.12);overflow:hidden;user-select:none}
 .titlebar{position:absolute;inset:0 0 auto 0;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;z-index:5;pointer-events:none}
 .lights{display:flex;gap:7px}
 .lights i{width:12px;height:12px;border-radius:50%;background:#ff5f57;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)}
@@ -183,7 +183,40 @@ footer a:hover{color:var(--ink)}
   .hero{margin-top:36px}
   .lede{font-size:17px}
 }
+/* ---------- phones: a portrait 360x600 build of the walkthrough leads the page, the script title fades in
+   under it, and the lede / download / points follow below the fold (app.js moves .demo + h1 in the DOM) ---------- */
+@media (max-width:768px){
+  .demo{min-height:calc(100svh - 72px);display:flex;flex-direction:column;align-items:center;padding:3svh 16px 12px}
+  .window-scale{--win-w:360;--win-h:600;aspect-ratio:auto}
+  .caption{display:none}
+  .demo h1.script{margin:30px 0 0;opacity:0;transform:translateY(14px);transition:opacity .9s ease,transform .9s cubic-bezier(.2,.7,.2,1)}
+  .demo h1.script.in{opacity:1;transform:none}
+  .demo h1.script .l2{white-space:normal}
+  .hero{margin-top:40px}
+  .hero h1.script{display:none}
+
+  /* narrow-column layouts for each view (titlebar stays 44px; content starts under it) */
+  .cursor{display:none}
+  .view-plaintext .raw{top:56px;left:0;right:0;padding:0 18px;font-size:13px;line-height:1.7;max-width:none}
+  .doc{left:18px;right:18px;width:auto;top:56px;font-size:15px}
+  .doc h2{font-size:24px;margin-bottom:18px}
+  .doc p,.doc ul{margin-bottom:20px}
+  .x-col{left:0;width:100%;top:44px;border:0}
+  .x-tabs{height:44px}
+  .x-col>.x-tabs+.ghost{display:none}
+  .x-post{padding:12px 14px}
+  .x-col .post-text{font-size:14px}
+  .li-col{left:10px;right:10px;width:auto;top:54px}
+  .li-start,.li-sort{display:none}
+  .li-card .post-text{font-size:13.5px}
+  .sl-side{display:none}
+  .sl-top{margin-top:44px}
+  .view-slack .sl-msg .post-text{font-size:13px;line-height:1.45}
+  .view-slack .sl-msgs{display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:10px}
+  .view-slack .sl-divider{margin:10px 0}
+}
 @media (prefers-reduced-motion:reduce){
+  .demo h1.script{transition:none}
   .cursor{display:none}
   .view,.btn{transition:none}
 }
