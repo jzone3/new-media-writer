@@ -11,14 +11,20 @@ enum LinkedInTheme {
     static let fold = 210
     static let columnWidth: CGFloat = 555
 
-    static let editorTheme = EditorTheme.post(
-        size: 14,
-        text: .adaptive(light: 0x191919, dark: 0xE9E5DF),
-        secondary: .adaptive(light: 0x666666, dark: 0xB0B0B0),
-        accent: NSColor(blue),
-        codeBackground: NSColor.labelColor.withAlphaComponent(0.055),
-        lineHeightMultiple: 1.35
-    )
+    /// LinkedIn has no bold/italic/strikethrough (Copy strips them too), so the card shows the text as it will post.
+    static let editorTheme: EditorTheme = {
+        var theme = EditorTheme.post(
+            size: 14,
+            text: .adaptive(light: 0x191919, dark: 0xE9E5DF),
+            secondary: .adaptive(light: 0x666666, dark: 0xB0B0B0),
+            accent: NSColor(blue),
+            codeBackground: NSColor.labelColor.withAlphaComponent(0.055),
+            lineHeightMultiple: 1.35
+        )
+        theme.rendersEmphasis = false
+        theme.headingFontOverride = { _ in .systemFont(ofSize: 14) }
+        return theme
+    }()
 }
 
 struct LinkedInFeedView: View {
