@@ -573,8 +573,16 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     /// Plain text for a paste; falls back to the text of rich (RTF/HTML) content when no plain-text type is present.
     static func plainText(on pboard: NSPasteboard) -> String? {
         if let s = pboard.string(forType: .string) { return s }
-        let rich = pboard.readObjects(forClasses: [NSAttributedString.self], options: nil)?.first as? NSAttributedString
-        return rich?.string
+        if let rich = pboard.readObjects(forClasses: [NSAttributedString.self], options: nil)?.first as? NSAttributedString {
+            return rich.string
+        }
+        if let data = pboard.data(forType: .rtf), let rtf = NSAttributedString(rtf: data, documentAttributes: nil) {
+            return rtf.string
+        }
+        if let data = pboard.data(forType: .html), let html = NSAttributedString(html: data, documentAttributes: nil) {
+            return html.string
+        }
+        return nil
     }
 
     /// The first editor under `root` that is actually on screen (not hidden, not scrolled out of view),
