@@ -188,13 +188,8 @@ struct SlackMessage: View {
                     Text(Date(), style: .time).font(.system(size: 12)).foregroundStyle(SlackTheme.secondary)
                 }
                 PostEditor(text: markdown, theme: SlackTheme.editorTheme, documentURL: baseURL,
+                           placeholder: "Message #\(profile.slackChannel)",
                            takesFocusOnAppear: true, onChange: onEdit)
-                    .overlay(alignment: .topLeading) {
-                        if markdown.isEmpty {
-                            Text("Message #\(profile.slackChannel)").font(.system(size: 15)).foregroundStyle(SlackTheme.secondary)
-                                .allowsHitTesting(false)
-                        }
-                    }
                 if !images.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(Array(images.enumerated()), id: \.offset) { _, url in

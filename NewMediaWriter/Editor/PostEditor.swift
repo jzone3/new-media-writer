@@ -6,6 +6,7 @@ struct PostEditor: NSViewRepresentable {
     var text: String
     var theme: EditorTheme
     var documentURL: URL?
+    var placeholder: String? = nil
     var foldAfter: Int? = nil
     var foldStyle = FoldMarkerStyle()
     var takesFocusOnAppear = false
@@ -32,6 +33,7 @@ struct PostEditor: NSViewRepresentable {
         textView.autoresizingMask = []
         textView.delegate = context.coordinator
         textView.documentURL = documentURL
+        textView.placeholder = placeholder
         textView.styler.theme = theme
         textView.foldAfterVisibleCharacters = foldAfter
         textView.foldStyle = foldStyle
@@ -51,6 +53,7 @@ struct PostEditor: NSViewRepresentable {
     func updateNSView(_ textView: EditorTextView, context: Context) {
         context.coordinator.parent = self
         textView.documentURL = documentURL
+        textView.placeholder = placeholder
         textView.foldAfterVisibleCharacters = foldAfter
         textView.foldStyle = foldStyle
         let current = textView.string

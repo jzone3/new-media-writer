@@ -145,14 +145,8 @@ struct LinkedInPostCard: View {
             header.padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 8)
 
             PostEditor(text: markdown, theme: LinkedInTheme.editorTheme, documentURL: baseURL,
+                       placeholder: "What do you want to talk about?",
                        foldAfter: LinkedInTheme.fold, takesFocusOnAppear: true, onChange: onEdit)
-                .overlay(alignment: .topLeading) {
-                    if markdown.isEmpty {
-                        Text("What do you want to talk about?")
-                            .font(.system(size: 14)).foregroundStyle(LinkedInTheme.secondary)
-                            .allowsHitTesting(false)
-                    }
-                }
                 .padding(.horizontal, 16).padding(.bottom, 12)
 
             if !images.isEmpty {

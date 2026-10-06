@@ -72,6 +72,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     var topInset: CGFloat = 56
     /// Embedded in a feed card: no centred column, text spans the full frame width.
     var fillsWidth = false
+    var placeholder: String?
     /// Feed cards show media in their own grid, so the editor skips inline image rendering.
     var showsImages = true { didSet { styler.revealsBrokenImages = showsImages } }
     /// Draws a dashed fold line + label after this many visible (non-marker) characters.
@@ -349,6 +350,18 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        if string.isEmpty, let placeholder {
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.lineHeightMultiple = styler.theme.lineHeightMultiple
+            (placeholder as NSString).draw(
+                at: textContainerOrigin,
+                withAttributes: [
+                    .font: styler.theme.body,
+                    .foregroundColor: styler.theme.secondary,
+                    .paragraphStyle: paragraph,
+                ]
+            )
+        }
         drawFoldMarker()
     }
 

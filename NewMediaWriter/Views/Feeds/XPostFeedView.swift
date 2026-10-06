@@ -84,6 +84,13 @@ struct XPostFeedView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
         .help("Add a post to the thread (inserts a --- separator)")
         .overlay(alignment: .bottom) { XTheme.border.frame(height: 1) }
     }
@@ -244,15 +251,9 @@ struct XPostCell: View {
                     .font(.system(size: 15))
 
                     PostEditor(text: markdown, theme: XTheme.editorTheme, documentURL: baseURL,
+                               placeholder: index == 0 ? "What is happening?!" : "Post \(index + 1)…",
                                foldAfter: XTheme.fold, foldStyle: XTheme.foldStyle,
                                takesFocusOnAppear: takesFocus, onChange: onEdit)
-                        .overlay(alignment: .topLeading) {
-                            if markdown.isEmpty {
-                                Text(index == 0 ? "What is happening?!" : "Post \(index + 1)…")
-                                    .font(.system(size: 15)).foregroundStyle(XTheme.secondary)
-                                    .allowsHitTesting(false)
-                            }
-                        }
 
                     if !images.isEmpty {
                         MediaGrid(urls: images, cornerRadius: 16)
