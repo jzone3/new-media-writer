@@ -538,8 +538,10 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     // MARK: - Paste & drop
 
+    // Rich types are listed so Paste validates (and ⌘V fires) for an RTF/HTML-only pasteboard;
+    // they are pasted as their plain text, see `plainText(on:)`.
     override var readablePasteboardTypes: [NSPasteboard.PasteboardType] {
-        [.fileURL, .png, .tiff, .string]
+        [.fileURL, .png, .tiff, .string, .rtf, .rtfd, .html]
     }
 
     /// Feed cards take image drops anywhere on the card, so their editors only accept text drags.
@@ -555,7 +557,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
             setSelectedRange(NSRange(location: (string as NSString).length, length: 0))
         }
         if insertImages(from: pboard) { return true }
-        if type == .string, let s = pboard.string(forType: .string) {
+        if [.string, .rtf, .rtfd, .html].contains(type), let s = EditorTextView.plainText(on: pboard) {
             insertText(s, replacementRange: selectedRange())
             return true
         }
@@ -565,9 +567,43 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     // NSTextView.pasteAsPlainText silently did nothing here, so paste the string ourselves.
     override func paste(_ sender: Any?) {
         if insertImages(from: .general) { return }
-        if let s = NSPasteboard.general.string(forType: .string) {
+        if let s = EditorTextView.plainText(on: .general) {
             insertText(s, replacementRange: selectedRange())
         }
+    }
+
+    /// Plain text for a paste; falls back to the text of rich (RTF/HTML) content when no plain-text type is present.
+    static func plainText(on pboard: NSPasteboard) -> String? {
+        if let s = pboard.string(forType: .string) { return s }
+        if let rich = pboard.readObjects(forClasses: [NSAttributedString.self], options: nil)?.first as? NSAttributedString {
+            return rich.string
+        }
+        if let data = pboard.data(forType: .rtf), let rtf = NSAttributedString(rtf: data, documentAttributes: nil) {
+            return rtf.string
+        }
+        if let data = pboard.data(forType: .html), let html = NSAttributedString(html: data, documentAttributes: nil) {
+            return html.string
+        }
+        return nil
+    }
+
+    /// The first editor under `root` that is actually on screen (not hidden, not scrolled out of view),
+    /// used to route ⌘V when nothing in the window has focus. Falls back to the first editor at all.
+    static func firstVisible(in root: NSView) -> EditorTextView? {
+        var all: [EditorTextView] = []
+        collectEditors(in: root, into: &all)
+        // SwiftUI's ScrollView clips without NSClipView, so `visibleRect` is useless here; test the
+        // editor's frame in the window's content coordinates instead (convert accounts for scrolling).
+        let onScreen = all.first { editor in
+            let frame = editor.convert(editor.bounds, to: root)
+            return frame.intersects(root.bounds) && frame.height > 0
+        }
+        return onScreen ?? all.first
+    }
+
+    private static func collectEditors(in view: NSView, into result: inout [EditorTextView]) {
+        if let editor = view as? EditorTextView, !editor.isHiddenOrHasHiddenAncestor { result.append(editor) }
+        for sub in view.subviews { collectEditors(in: sub, into: &result) }
     }
 
     override func pasteAsPlainText(_ sender: Any?) { paste(sender) }

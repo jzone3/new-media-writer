@@ -52,18 +52,24 @@ struct ViewCommands: Commands {
     @FocusedValue(\.viewMode) private var viewMode
     @FocusedValue(\.viewPickerShown) private var viewPickerShown
 
+    /// Keyboard view switches also dismiss an open ⌘K picker, which would otherwise stay up over the new view.
+    private func select(_ mode: ViewMode) {
+        viewMode?.wrappedValue = mode
+        viewPickerShown?.wrappedValue = false
+    }
+
     private func step(_ delta: Int) {
         guard let viewMode else { return }
         let all = ViewMode.allCases
         let i = all.firstIndex(of: viewMode.wrappedValue) ?? 0
-        viewMode.wrappedValue = all[(i + delta + all.count) % all.count]
+        select(all[(i + delta + all.count) % all.count])
     }
 
     var body: some Commands {
         CommandGroup(after: .sidebar) {
             Divider()
             ForEach(ViewMode.allCases) { m in
-                Button(m.title) { viewMode?.wrappedValue = m }
+                Button(m.title) { select(m) }
                     .keyboardShortcut(m.shortcut, modifiers: .command)
             }
             Divider()
@@ -71,10 +77,10 @@ struct ViewCommands: Commands {
                 .keyboardShortcut("k", modifiers: .command)
                 .disabled(viewPickerShown == nil)
             Button("Previous View") { step(-1) }
-                .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+                .keyboardShortcut(.leftArrow, modifiers: .command)
                 .disabled(viewMode == nil)
             Button("Next View") { step(1) }
-                .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+                .keyboardShortcut(.rightArrow, modifiers: .command)
                 .disabled(viewMode == nil)
         }
         CommandGroup(replacing: .textFormatting) {

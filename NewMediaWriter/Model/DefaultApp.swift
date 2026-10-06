@@ -42,7 +42,7 @@ enum DefaultApp {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// Dock click with no windows open: a new Untitled document instead of DocumentGroup's Open panel.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         guard !hasVisibleWindows else { return true }
@@ -50,7 +50,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
+    /// ⌘V with no focused editor (end of the responder chain): focus the key window's editor and paste there.
+    /// Windows without an editor (Settings, panels) leave Paste disabled, as before.
+    private var keyWindowEditor: EditorTextView? {
+        guard let root = NSApp.keyWindow?.contentView else { return nil }
+        return EditorTextView.firstVisible(in: root)
+    }
+
+    @objc func paste(_ sender: Any?) {
+        guard let editor = keyWindowEditor, let window = editor.window else { return }
+        window.makeFirstResponder(editor)
+        editor.paste(sender)
+    }
+
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        item.action == #selector(paste(_:)) ? keyWindowEditor != nil : true
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // ⌥⌘←/→ is the older shortcut for Previous/Next View; feed it to the menu as ⌘←/→.
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard flags.subtracting([.function, .numericPad, .capsLock]) == [.command, .option],
+                  event.keyCode == 123 || event.keyCode == 124 else { return event }
+            return NSEvent.keyEvent(with: .keyDown, location: event.locationInWindow, modifierFlags: flags.subtracting(.option),
+                                    timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil,
+                                    characters: event.charactersIgnoringModifiers ?? "",
+                                    charactersIgnoringModifiers: event.charactersIgnoringModifiers ?? "",
+                                    isARepeat: event.isARepeat, keyCode: event.keyCode) ?? event
+        }
         // DocumentGroup opens its Open panel when launched with nothing to open (and ignores
         // applicationShouldOpenUntitledFile). Swap that launch panel for an Untitled document; a
         // launch with a file never shows the panel, so nothing happens then.
