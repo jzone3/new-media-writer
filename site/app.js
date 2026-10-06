@@ -36,7 +36,7 @@ That to secure these rights, Governments are instituted among Men, deriving thei
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
   const charAt = [];            // time each char appears
   const clicks = [];            // {view, moveStart, clickAt}
-  let t = 600, bi = 0;
+  let t = 400, bi = 0;
   for (let i = 0; i < SOURCE.length; i++) {
     if (bi < BREAKS.length && BREAKS[bi].at === i) {
       t += 250;
