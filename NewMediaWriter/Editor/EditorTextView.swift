@@ -191,6 +191,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     override func didChangeText() {
         super.didChangeText()
         if let textStorage { styler.restyle(textStorage) }
+        matchEmptyCaretToPlaceholder()
         updateActiveParagraph(invalidate: true)
         if foldAfterVisibleCharacters != nil { refreshFold() }
         needsImageLayout = true
@@ -497,9 +498,19 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     func restyleAndRelayout() {
         guard let textStorage else { return }
         styler.restyle(textStorage)
+        matchEmptyCaretToPlaceholder()
         foldIndexCache = nil
         needsImageLayout = true
         layoutImages()
+    }
+
+    /// An empty view has no text to carry the theme's font/line height, so the caret would use the
+    /// system defaults and sit above the placeholder.
+    private func matchEmptyCaretToPlaceholder() {
+        guard string.isEmpty else { return }
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineHeightMultiple = styler.theme.lineHeightMultiple
+        typingAttributes = [.font: styler.theme.body, .foregroundColor: styler.theme.text, .paragraphStyle: paragraph]
     }
 
     private var isLayingOutImages = false

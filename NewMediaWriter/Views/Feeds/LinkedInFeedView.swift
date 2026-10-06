@@ -44,8 +44,8 @@ struct LinkedInFeedView: View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 VStack(spacing: 8) {
-                    composer
                     sortRow
+                    ghostPost(seed: 0, hasImage: false)
                     LinkedInPostCard(markdown: text, images: images, profile: profile, baseURL: baseURL,
                                      onEdit: { document.text = $0 })
                     ghostPost(seed: 1, hasImage: false)
@@ -62,33 +62,6 @@ struct LinkedInFeedView: View {
             }
             .padding(16)
         }
-    }
-
-    private var composer: some View {
-        card {
-            VStack(spacing: 10) {
-                HStack(spacing: 10) {
-                    AvatarView(profile: profile, size: 48)
-                    Text("Start a post")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(LinkedInTheme.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16).frame(height: 48)
-                        .overlay(Capsule().strokeBorder(LinkedInTheme.border))
-                }
-                HStack {
-                    ForEach(["photo.fill", "play.rectangle.fill", "doc.text.fill"], id: \.self) {
-                        Label($0 == "photo.fill" ? "Media" : $0 == "play.rectangle.fill" ? "Video" : "Write article", systemImage: $0)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(LinkedInTheme.secondary)
-                        Spacer()
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-            .padding(12)
-        }
-        .opacity(0.8)
     }
 
     private var sortRow: some View {
