@@ -20,3 +20,4 @@ jobs:
           xcodebuild -project NewMediaWriter.xcodeproj -scheme NewMediaWriter
           -configuration Debug -derivedDataPath build
           CODE_SIGNING_ALLOWED=NO build | tail -20
+      - run: scripts/test-export.sh

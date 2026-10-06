@@ -55,43 +55,43 @@ enum Exporter {
 
     // MARK: LinkedIn
 
+    /// Plain text plus line-per-`<div>` HTML: LinkedIn's rich composer drops the plain flavor's blank lines.
     static func linkedIn(_ text: String) -> Payload {
-        Payload(plain: MarkdownRender.plainText(text))
+        let plain = MarkdownRender.plainText(text)
+        return Payload(plain: plain, html: document(lineDivs(plain)))
     }
 
     // MARK: Slack
 
     /// mrkdwn as the plain flavor (what Slack parses when you paste text) plus HTML for the rich composer.
     static func slack(_ text: String) -> Payload {
-        let blocks = MarkdownParser.parse(text)
-        return Payload(plain: mrkdwn(blocks), html: html(blocks, headings: false))
+        let blocks = MarkdownParser.parseSpaced(text)
+        return Payload(plain: mrkdwn(blocks), html: slackHTML(blocks))
     }
 
     static func slackPlain(_ text: String) -> Payload {
-        Payload(plain: mrkdwn(MarkdownParser.parse(text)))
+        Payload(plain: mrkdwn(MarkdownParser.parseSpaced(text)))
     }
 
-    static func mrkdwn(_ blocks: [MDBlock]) -> String {
-        var parts: [String] = []
-        for block in blocks {
+    static func mrkdwn(_ blocks: [(block: MDBlock, blankLinesBefore: Int)]) -> String {
+        MarkdownRender.joinBlocks(blocks, separator: MarkdownRender.blankLines) { block in
             switch block {
             case .heading(_, let t):
-                parts.append("*\(MarkdownInline.plain(t))*")
+                "*\(MarkdownInline.plain(t))*"
             case .paragraph(let t):
-                parts.append(inlineMrkdwn(t))
+                inlineMrkdwn(t)
             case .quote(let lines):
-                parts.append(lines.map { "> " + inlineMrkdwn($0) }.joined(separator: "\n"))
+                lines.map { "> " + inlineMrkdwn($0) }.joined(separator: "\n")
             case .code(_, let code):
-                parts.append("```\n\(code)\n```")
+                "```\n\(code)\n```"
             case .list(let ordered, let items):
-                parts.append(items.enumerated().map { i, item in
+                items.enumerated().map { i, item in
                     (ordered ? "\(i + 1). " : "• ") + inlineMrkdwn(item)
-                }.joined(separator: "\n"))
+                }.joined(separator: "\n")
             case .image, .rule:
-                break
+                nil
             }
         }
-        return parts.joined(separator: "\n\n")
     }
 
     static func inlineMrkdwn(_ text: String) -> String {
@@ -130,27 +130,33 @@ enum Exporter {
         "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body>\(body)</body></html>"
     }
 
-    static func html(_ blocks: [MDBlock], headings: Bool) -> String {
-        var out = ""
-        for block in blocks {
+    /// Rich composers like Slack's map each block element to one line and ignore `<p>` margins,
+    /// so every blank line is spelled out as an empty `<div><br></div>`.
+    static func slackHTML(_ blocks: [(block: MDBlock, blankLinesBefore: Int)]) -> String {
+        let body = MarkdownRender.joinBlocks(blocks, separator: { String(repeating: emptyLine, count: $0) }) { block in
             switch block {
-            case .heading(let level, let t):
-                let inner = inlineHTML(MarkdownInline.attributed(t), paragraphs: false)
-                out += headings ? "<h\(level)>\(inner)</h\(level)>" : "<p><b>\(inner)</b></p>"
+            case .heading(_, let t):
+                "<div><b>\(inlineHTML(MarkdownInline.attributed(t), paragraphs: false))</b></div>"
             case .paragraph(let t):
-                out += inlineHTML(MarkdownInline.attributed(t), paragraphs: true)
+                "<div>\(inlineHTML(MarkdownInline.attributed(t), paragraphs: false).replacingOccurrences(of: "\n", with: "<br>"))</div>"
             case .quote(let lines):
-                out += "<blockquote>" + lines.map { inlineHTML(MarkdownInline.attributed($0), paragraphs: true) }.joined() + "</blockquote>"
+                "<blockquote>" + lines.map { "<div>\(inlineHTML(MarkdownInline.attributed($0), paragraphs: false))</div>" }.joined() + "</blockquote>"
             case .code(_, let code):
-                out += "<pre><code>\(escape(code))</code></pre>"
+                "<pre><code>\(escape(code))</code></pre>"
             case .list(let ordered, let items):
-                let tag = ordered ? "ol" : "ul"
-                out += "<\(tag)>" + items.map { "<li>\(inlineHTML(MarkdownInline.attributed($0), paragraphs: false))</li>" }.joined() + "</\(tag)>"
+                "<\(ordered ? "ol" : "ul")>" + items.map { "<li>\(inlineHTML(MarkdownInline.attributed($0), paragraphs: false))</li>" }.joined() + "</\(ordered ? "ol" : "ul")>"
             case .image, .rule:
-                break
+                nil
             }
         }
-        return document(out)
+        return document(body)
+    }
+
+    private static let emptyLine = "<div><br></div>"
+
+    /// One `<div>` per line of plain text; empty lines become `<div><br></div>`.
+    static func lineDivs(_ plain: String) -> String {
+        plain.components(separatedBy: "\n").map { $0.isEmpty ? emptyLine : "<div>\(escape($0))</div>" }.joined()
     }
 
     static func inlineHTML(_ attributed: AttributedString, paragraphs: Bool) -> String {
