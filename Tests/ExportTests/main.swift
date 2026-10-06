@@ -35,6 +35,10 @@ expect("linkedin html is one unformatted div per line", linkedIn.html, doc(
     + "<div>• a</div><div>• b</div>\(br)<div>“quote”</div>\(br)<div>code</div>\(br)<div>more</div>\(br)<div>End</div>"))
 expect("linkedin escapes html", Exporter.linkedIn("a < b & c").html, doc("<div>a &lt; b &amp; c</div>"))
 
+expect("linkedin html keeps repeated and leading spaces", Exporter.linkedIn("a  b").html, doc("<div>a &nbsp;b</div>"))
+expect("slack html keeps blank lines inside quotes", Exporter.slack("> first\n>\n> last").html,
+       doc("<blockquote><div>first</div>\(br)<div>last</div></blockquote>"))
+
 expect("leading, trailing and skipped-block blank lines", Exporter.slack("\n\nA\n\n---\n\n\nB\n\n\n").plain, "A\n\n\nB")
 
 let x = Exporter.xThread(source)

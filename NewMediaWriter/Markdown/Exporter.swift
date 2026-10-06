@@ -140,7 +140,7 @@ enum Exporter {
             case .paragraph(let t):
                 "<div>\(inlineHTML(MarkdownInline.attributed(t), paragraphs: false).replacingOccurrences(of: "\n", with: "<br>"))</div>"
             case .quote(let lines):
-                "<blockquote>" + lines.map { "<div>\(inlineHTML(MarkdownInline.attributed($0), paragraphs: false))</div>" }.joined() + "</blockquote>"
+                "<blockquote>" + lines.map { $0.isEmpty ? emptyLine : "<div>\(inlineHTML(MarkdownInline.attributed($0), paragraphs: false))</div>" }.joined() + "</blockquote>"
             case .code(_, let code):
                 "<pre><code>\(escape(code))</code></pre>"
             case .list(let ordered, let items):
@@ -156,7 +156,18 @@ enum Exporter {
 
     /// One `<div>` per line of plain text; empty lines become `<div><br></div>`.
     static func lineDivs(_ plain: String) -> String {
-        plain.components(separatedBy: "\n").map { $0.isEmpty ? emptyLine : "<div>\(escape($0))</div>" }.joined()
+        plain.components(separatedBy: "\n").map { $0.isEmpty ? emptyLine : "<div>\(keepSpaces(escape($0)))</div>" }.joined()
+    }
+
+    /// HTML collapses runs of spaces, so every space at line start or after another space becomes `&nbsp;`.
+    static func keepSpaces(_ html: String) -> String {
+        var out = ""
+        var previousIsSpace = true
+        for ch in html {
+            out += ch == " " && previousIsSpace ? "&nbsp;" : String(ch)
+            previousIsSpace = ch == " "
+        }
+        return out
     }
 
     static func inlineHTML(_ attributed: AttributedString, paragraphs: Bool) -> String {
