@@ -50,7 +50,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
+    /// ⌘V with no focused editor (end of the responder chain): focus the window's editor and paste there.
+    @objc func paste(_ sender: Any?) {
+        guard let window = NSApp.keyWindow, let root = window.contentView,
+              let editor = EditorTextView.firstVisible(in: root) else { NSSound.beep(); return }
+        window.makeFirstResponder(editor)
+        editor.paste(sender)
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // ⌥⌘←/→ is the older shortcut for Previous/Next View; feed it to the menu as ⌘←/→.
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard flags.subtracting([.function, .numericPad]) == [.command, .option],
+                  event.keyCode == 123 || event.keyCode == 124 else { return event }
+            return NSEvent.keyEvent(with: .keyDown, location: event.locationInWindow, modifierFlags: flags.subtracting(.option),
+                                    timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil,
+                                    characters: event.charactersIgnoringModifiers ?? "",
+                                    charactersIgnoringModifiers: event.charactersIgnoringModifiers ?? "",
+                                    isARepeat: event.isARepeat, keyCode: event.keyCode) ?? event
+        }
         // DocumentGroup opens its Open panel when launched with nothing to open (and ignores
         // applicationShouldOpenUntitledFile). Swap that launch panel for an Untitled document; a
         // launch with a file never shows the panel, so nothing happens then.

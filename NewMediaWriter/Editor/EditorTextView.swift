@@ -565,9 +565,25 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     // NSTextView.pasteAsPlainText silently did nothing here, so paste the string ourselves.
     override func paste(_ sender: Any?) {
         if insertImages(from: .general) { return }
-        if let s = NSPasteboard.general.string(forType: .string) {
+        if let s = EditorTextView.plainText(on: .general) {
             insertText(s, replacementRange: selectedRange())
         }
+    }
+
+    /// Plain text for a paste; falls back to the text of rich (RTF/HTML) content when no plain-text type is present.
+    static func plainText(on pboard: NSPasteboard) -> String? {
+        if let s = pboard.string(forType: .string) { return s }
+        let rich = pboard.readObjects(forClasses: [NSAttributedString.self], options: nil)?.first as? NSAttributedString
+        return rich?.string
+    }
+
+    /// The first on-screen editor under `root`, used to route ⌘V when nothing in the window has focus.
+    static func firstVisible(in root: NSView) -> EditorTextView? {
+        if let editor = root as? EditorTextView, !editor.isHiddenOrHasHiddenAncestor { return editor }
+        for sub in root.subviews {
+            if let editor = firstVisible(in: sub) { return editor }
+        }
+        return nil
     }
 
     override func pasteAsPlainText(_ sender: Any?) { paste(sender) }
