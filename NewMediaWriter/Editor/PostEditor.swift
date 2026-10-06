@@ -81,8 +81,9 @@ struct PostEditor: NSViewRepresentable {
         layoutManager.ensureLayout(for: container)
         let used = layoutManager.usedRect(for: container)
         let minHeight = theme.body.pointSize * theme.lineHeightMultiple
+        let placeholderHeight = textView.string.isEmpty ? textView.placeholderHeight(for: width) : 0
         let foldBottom = textView.foldMarkerBottom ?? 0
-        return CGSize(width: width, height: max(ceil(used.height), minHeight, ceil(foldBottom)) + 2)
+        return CGSize(width: width, height: max(ceil(used.height), minHeight, placeholderHeight, ceil(foldBottom)) + 2)
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {

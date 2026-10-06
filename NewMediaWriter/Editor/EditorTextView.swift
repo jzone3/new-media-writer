@@ -72,7 +72,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     var topInset: CGFloat = 56
     /// Embedded in a feed card: no centred column, text spans the full frame width.
     var fillsWidth = false
-    var placeholder: String?
+    var placeholder: String? { didSet { needsDisplay = true } }
     /// Feed cards show media in their own grid, so the editor skips inline image rendering.
     var showsImages = true { didSet { styler.revealsBrokenImages = showsImages } }
     /// Draws a dashed fold line + label after this many visible (non-marker) characters.
@@ -351,18 +351,33 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         if string.isEmpty, let placeholder {
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.lineHeightMultiple = styler.theme.lineHeightMultiple
+            let origin = textContainerOrigin
             (placeholder as NSString).draw(
-                at: textContainerOrigin,
-                withAttributes: [
-                    .font: styler.theme.body,
-                    .foregroundColor: styler.theme.secondary,
-                    .paragraphStyle: paragraph,
-                ]
+                with: NSRect(x: origin.x, y: origin.y, width: columnWidth, height: bounds.height - origin.y),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: placeholderAttributes
             )
         }
         drawFoldMarker()
+    }
+
+    func placeholderHeight(for width: CGFloat) -> CGFloat {
+        guard let placeholder else { return 0 }
+        return ceil((placeholder as NSString).boundingRect(
+            with: NSSize(width: width, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: placeholderAttributes
+        ).height)
+    }
+
+    private var placeholderAttributes: [NSAttributedString.Key: Any] {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineHeightMultiple = styler.theme.lineHeightMultiple
+        return [
+            .font: styler.theme.body,
+            .foregroundColor: styler.theme.secondary,
+            .paragraphStyle: paragraph,
+        ]
     }
 
     private var foldLabel: NSString { foldStyle.label as NSString }

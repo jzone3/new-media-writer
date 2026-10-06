@@ -85,11 +85,7 @@ struct XPostFeedView: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            if hovering {
-                NSCursor.pointingHand.push()
-            } else {
-                NSCursor.pop()
-            }
+            (hovering ? NSCursor.pointingHand : NSCursor.arrow).set()
         }
         .help("Add a post to the thread (inserts a --- separator)")
         .overlay(alignment: .bottom) { XTheme.border.frame(height: 1) }
