@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 extension View {
-    /// Makes a feed card a drop target for image files and image data. Dropped images are saved to `assets/`
+    /// Makes a feed card a drop target for image/video files and image data. Dropped media is saved to `assets/`
     /// beside the document and appended to `markdown` as `![]()` lines through `onEdit`, so they show up in
     /// the card's media grid. Untitled documents get a "save first" prompt instead.
     func imageDrop(documentURL: URL?, markdown: String, accent: Color, cornerRadius: CGFloat = 12,
@@ -43,7 +43,7 @@ private struct ImageDropDelegate: DropDelegate {
 
     private var pasteboard: NSPasteboard { NSPasteboard(name: .drag) }
 
-    func validateDrop(info: DropInfo) -> Bool { ImageStore.hasImages(on: pasteboard) }
+    func validateDrop(info: DropInfo) -> Bool { ImageStore.hasMedia(on: pasteboard) }
     func dropEntered(info: DropInfo) { targeted.wrappedValue = true }
     func dropExited(info: DropInfo) { targeted.wrappedValue = false }
     func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .copy) }
@@ -60,7 +60,7 @@ private struct ImageDropDelegate: DropDelegate {
             }
             return true
         }
-        guard let paths = ImageStore(documentURL: documentURL).storeImages(from: pasteboard) else { return false }
+        guard let paths = ImageStore(documentURL: documentURL).storeMedia(from: pasteboard) else { return false }
         var text = markdown
         if !text.isEmpty, !text.hasSuffix("\n") { text += "\n" }
         onEdit(text + ImageStore.markdown(for: paths) + "\n")

@@ -188,6 +188,19 @@ enum MarkdownParser {
         }
     }
 
+    /// Removes the `index`-th `![]()` reference (in `images(in:)` order); a line left blank is removed with it.
+    static func removingImage(at index: Int, from text: String) -> String {
+        let ns = text as NSString
+        let matches = imageRegex.matches(in: text, range: NSRange(location: 0, length: ns.length))
+        guard matches.indices.contains(index) else { return text }
+        let match = matches[index].range
+        let line = ns.lineRange(for: match)
+        let rest = (ns.substring(with: line) as NSString)
+            .replacingCharacters(in: NSRange(location: match.location - line.location, length: match.length), with: "")
+        let cut = rest.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? line : match
+        return ns.replacingCharacters(in: cut, with: "")
+    }
+
     static func listItem(_ t: String) -> (ordered: Bool, content: String)? {
         if t.hasPrefix("- ") || t.hasPrefix("* ") || t.hasPrefix("+ ") {
             return (false, String(t.dropFirst(2)))
