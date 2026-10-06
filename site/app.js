@@ -23,9 +23,9 @@ That to secure these rights, Governments are instituted among Men, deriving thei
 
   // Where the mouse switches view while the text is still being typed (char index into SOURCE).
   const BREAKS = [
-    { at: SOURCE.indexOf('We hold'),        view: 'markdown' },
-    { at: SOURCE.indexOf('- Life'),         view: 'x' },
-    { at: SOURCE.indexOf('That to secure'), view: 'linkedin' },
+    { at: SOURCE.indexOf('When in'),        view: 'x' },
+    { at: SOURCE.indexOf('We hold'),        view: 'linkedin' },
+    { at: SOURCE.indexOf('That to secure'), view: 'slack' },
   ];
   const LIMITS = { x: 25000, linkedin: 3000, slack: 40000 };
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -36,7 +36,7 @@ That to secure these rights, Governments are instituted among Men, deriving thei
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
   const charAt = [];            // time each char appears
   const clicks = [];            // {view, moveStart, clickAt}
-  let t = 900, bi = 0;
+  let t = 400, bi = 0;
   for (let i = 0; i < SOURCE.length; i++) {
     if (bi < BREAKS.length && BREAKS[bi].at === i) {
       t += 250;
@@ -49,9 +49,8 @@ That to secure these rights, Governments are instituted among Men, deriving thei
     t += ch === '\n' ? 70 : ch === ' ' ? 16 : 9 + rnd() * 11;
     if (ch === '.' || ch === ',' || ch === ':' || ch === '…') t += 40;
   }
-  t += 250;
-  clicks.push({ view: 'slack', moveStart: t, clickAt: t + MOVE + 90 });
-  t += MOVE + 90 + 2600;
+  // typing ends in Slack; hold on the finished message, then back to Plaintext for the loop
+  t += 2800;
   clicks.push({ view: 'plaintext', moveStart: t, clickAt: t + MOVE + 90 });
   const END = t + MOVE + 90 + 900;
 
@@ -249,7 +248,7 @@ That to secure these rights, Governments are instituted among Men, deriving thei
   }));
 
   if (reduce || navigator.webdriver && !location.hash.includes('play')) {
-    renderStatic('markdown');
+    renderStatic('x');
   } else {
     render(0);
     // Start as soon as any part of the window is on screen.

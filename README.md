@@ -4,7 +4,7 @@
 
 **[newmediawriter.app](https://newmediawriter.app/)** — download for Mac.
 
-![Plaintext → Markdown → X → LinkedIn → Slack, from one Markdown file](docs/walkthrough.gif)
+![Plaintext → X → LinkedIn → Slack, from one Markdown file](docs/walkthrough.gif)
 
 A minimalist, focus-first Markdown writing app for macOS. Write once in Markdown, then preview the same file as it would appear in the feed:
 
