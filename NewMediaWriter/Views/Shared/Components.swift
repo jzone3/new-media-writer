@@ -1,3 +1,4 @@
+import AVKit
 import SwiftUI
 
 extension Color {
@@ -111,13 +112,15 @@ struct DocumentImage: View {
     }
 }
 
-/// X / LinkedIn style media grid for 1–4 images.
+/// X / LinkedIn style media grid for 1–4 images or videos (videos play inline).
+/// With `onRemove`, each item gets a remove button; clicking an image opens it.
 struct MediaGrid: View {
     let urls: [URL?]
     var cornerRadius: CGFloat = 16
     var spacing: CGFloat = 2
     var singleAspect: CGFloat? = nil
     var showsBorder = true
+    var onRemove: ((Int) -> Void)? = nil
 
     var body: some View {
         let items = Array(urls.prefix(4))
@@ -126,32 +129,32 @@ struct MediaGrid: View {
             case 0: EmptyView()
             case 1:
                 if let aspect = singleAspect {
-                    Tile(url: items[0], aspect: aspect)
+                    tile(items, 0, aspect: aspect)
                 } else {
-                    SingleImage(url: items[0])
+                    SingleMedia(url: items[0]).mediaControls(url: items[0], onRemove: remover(0))
                 }
             case 2:
                 HStack(spacing: spacing) {
-                    Tile(url: items[0], aspect: 0.9)
-                    Tile(url: items[1], aspect: 0.9)
+                    tile(items, 0, aspect: 0.9)
+                    tile(items, 1, aspect: 0.9)
                 }
             case 3:
                 HStack(spacing: spacing) {
-                    Tile(url: items[0], aspect: 0.9)
+                    tile(items, 0, aspect: 0.9)
                     VStack(spacing: spacing) {
-                        Tile(url: items[1], aspect: 1.8)
-                        Tile(url: items[2], aspect: 1.8)
+                        tile(items, 1, aspect: 1.8)
+                        tile(items, 2, aspect: 1.8)
                     }
                 }
             default:
                 VStack(spacing: spacing) {
                     HStack(spacing: spacing) {
-                        Tile(url: items[0], aspect: 1.8)
-                        Tile(url: items[1], aspect: 1.8)
+                        tile(items, 0, aspect: 1.8)
+                        tile(items, 1, aspect: 1.8)
                     }
                     HStack(spacing: spacing) {
-                        Tile(url: items[2], aspect: 1.8)
-                        Tile(url: items[3], aspect: 1.8)
+                        tile(items, 2, aspect: 1.8)
+                        tile(items, 3, aspect: 1.8)
                     }
                 }
             }
@@ -162,26 +165,43 @@ struct MediaGrid: View {
             if showsBorder {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+                    .allowsHitTesting(false)
             }
         }
     }
 
-    /// Fixed-aspect cell: the image fills and is clipped, never dictating the cell size.
+    private func remover(_ index: Int) -> (() -> Void)? {
+        onRemove.map { remove in { remove(index) } }
+    }
+
+    private func tile(_ items: [URL?], _ index: Int, aspect: CGFloat) -> some View {
+        Tile(url: items[index], aspect: aspect).mediaControls(url: items[index], onRemove: remover(index))
+    }
+
+    /// Fixed-aspect cell: the media fills and is clipped, never dictating the cell size.
     private struct Tile: View {
         let url: URL?
         let aspect: CGFloat
         var body: some View {
             Color.clear
                 .aspectRatio(aspect, contentMode: .fit)
-                .overlay { DocumentImage(url: url) }
+                .overlay {
+                    if ImageStore.isVideo(url), let url {
+                        DocumentVideo(url: url)
+                    } else {
+                        DocumentImage(url: url)
+                    }
+                }
                 .clipped()
         }
     }
 
-    private struct SingleImage: View {
+    private struct SingleMedia: View {
         let url: URL?
         var body: some View {
-            if let url, let image = ImageCache.shared.image(for: url), image.size.height > 0 {
+            if ImageStore.isVideo(url), let url {
+                SingleVideo(url: url).id(FileIdentity(url))
+            } else if let url, let image = ImageCache.shared.image(for: url), image.size.height > 0 {
                 let ratio = image.size.width / image.size.height
                 if ratio < 0.8 {
                     Tile(url: url, aspect: 0.8)
@@ -192,6 +212,133 @@ struct MediaGrid: View {
                 DocumentImage(url: url).aspectRatio(16 / 9, contentMode: .fill)
             }
         }
+    }
+
+    /// A lone video is shown at its own aspect ratio (portrait clamped like images).
+    private struct SingleVideo: View {
+        let url: URL
+        @State private var ratio: CGFloat = 16 / 9
+        var body: some View {
+            Color.clear
+                .aspectRatio(max(ratio, 0.8), contentMode: .fit)
+                .overlay { DocumentVideo(url: url) }
+                .clipped()
+                .task(id: url) { if let r = await DocumentVideo.aspectRatio(of: url) { ratio = r } }
+        }
+    }
+}
+
+private extension View {
+    func mediaControls(url: URL?, onRemove: (() -> Void)?) -> some View {
+        modifier(MediaControls(url: url, onRemove: onRemove))
+    }
+}
+
+/// Remove button + open-on-click for one media item. Videos keep their clicks for the player controls.
+private struct MediaControls: ViewModifier {
+    let url: URL?
+    let onRemove: (() -> Void)?
+    @State private var hovering = false
+
+    private var isVideo: Bool { ImageStore.isVideo(url) }
+
+    func body(content: Content) -> some View {
+        content
+            .contentShape(Rectangle())
+            .onTapGesture { if !isVideo { open() } }
+            .onHover { inside in
+                guard !isVideo, inside != hovering else { return }
+                hovering = inside
+                if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
+            .onDisappear { if hovering { hovering = false; NSCursor.pop() } }
+            .help(isVideo ? "" : "Click to open \(url?.lastPathComponent ?? "image")")
+            .contextMenu {
+                if url != nil {
+                    Button(isVideo ? "Open Video" : "Open Image") { open() }
+                }
+                if let url, url.isFileURL {
+                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                }
+                if let onRemove {
+                    Divider()
+                    Button("Remove from Post", action: onRemove)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if let onRemove {
+                    Button(action: onRemove) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 26, height: 26)
+                            .background(Color.black.opacity(0.7), in: Circle())
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(isVideo ? "Remove video" : "Remove image")
+                    .padding(8)
+                }
+            }
+    }
+
+    private func open() {
+        guard let url else { return }
+        NSWorkspace.shared.open(url)
+    }
+}
+
+/// Inline, playable native video player for a local or remote video. Re-created when the file at
+/// `url` is replaced, so a new video saved under an old name never shows the old one.
+struct DocumentVideo: View {
+    let url: URL
+
+    var body: some View {
+        if url.isFileURL, FileIdentity(url) == nil {
+            ZStack {
+                Rectangle().fill(Color.primary.opacity(0.08))
+                VStack(spacing: 6) {
+                    Image(systemName: "video").font(.title2)
+                    Text(url.lastPathComponent).font(.caption)
+                }
+                .foregroundStyle(.secondary)
+            }
+        } else {
+            VideoPlayerView(url: url).id(FileIdentity(url))
+        }
+    }
+
+    static func aspectRatio(of url: URL) async -> CGFloat? {
+        let asset = AVURLAsset(url: url)
+        guard let track = try? await asset.loadTracks(withMediaType: .video).first,
+              let (size, transform) = try? await track.load(.naturalSize, .preferredTransform) else { return nil }
+        let rect = CGRect(origin: .zero, size: size).applying(transform)
+        guard rect.height != 0 else { return nil }
+        return abs(rect.width / rect.height)
+    }
+}
+
+private struct VideoPlayerView: NSViewRepresentable {
+    let url: URL
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = AVPlayerView()
+        view.controlsStyle = .inline
+        view.videoGravity = .resizeAspectFill
+        view.showsFullScreenToggleButton = true
+        view.player = AVPlayer(url: url)
+        return view
+    }
+
+    func updateNSView(_ view: AVPlayerView, context: Context) {
+        if (view.player?.currentItem?.asset as? AVURLAsset)?.url != url {
+            view.player = AVPlayer(url: url)
+        }
+    }
+
+    static func dismantleNSView(_ view: AVPlayerView, coordinator: ()) {
+        view.player?.pause()
+        view.player = nil
     }
 }
 
@@ -214,6 +361,7 @@ struct CopyButton: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .pointingHandCursor()
             .help("Copy for this view (⇧⌘C)")
 
             if !alternatives.isEmpty {
@@ -231,6 +379,7 @@ struct CopyButton: View {
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
                 .fixedSize()
+                .pointingHandCursor()
                 .padding(.leading, 4)
             }
         }
@@ -248,6 +397,32 @@ struct CopyButton: View {
         make().copy()
         copied = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
+    }
+}
+
+extension View {
+    /// Pointing-hand cursor while hovering a clickable control.
+    func pointingHandCursor() -> some View {
+        onContinuousHover { phase in
+            switch phase {
+            case .active: NSCursor.pointingHand.set()
+            case .ended: NSCursor.underMouse.set()
+            }
+        }
+    }
+}
+
+private extension NSCursor {
+    /// Arrow, or I-beam when leaving a control straight into editable text.
+    static var underMouse: NSCursor {
+        guard let window = NSApp.keyWindow, let content = window.contentView else { return .arrow }
+        let point = content.convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+        var view = content.hitTest(point)
+        while let v = view {
+            if let text = v as? NSTextView { return text.isEditable ? .iBeam : .arrow }
+            view = v.superview
+        }
+        return .arrow
     }
 }
 

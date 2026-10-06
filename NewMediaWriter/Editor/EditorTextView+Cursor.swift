@@ -17,8 +17,9 @@ extension EditorTextView {
         let editorRoot: NSView = enclosingScrollView ?? self
         let overOverlay = !(hit === editorRoot || hit.isDescendant(of: editorRoot))
         if overOverlay {
-            NSCursor.arrow.set()
-        } else if NSCursor.current == NSCursor.arrow {
+            // Clickable chrome (Copy, menus) sets the pointing hand itself; don't flatten it to the arrow.
+            if NSCursor.current != NSCursor.pointingHand { NSCursor.arrow.set() }
+        } else if NSCursor.current == NSCursor.arrow || NSCursor.current == NSCursor.pointingHand {
             NSCursor.iBeam.set()
         }
         return overOverlay

@@ -19,15 +19,27 @@ struct MDImage: Equatable, Hashable {
 /// block text and handled by `MarkdownInline`.
 enum MarkdownParser {
     static func parse(_ text: String) -> [MDBlock] {
-        var blocks: [MDBlock] = []
+        parseSpaced(text).map(\.block)
+    }
+
+    /// Blocks plus the number of blank source lines in front of each, so exports can keep
+    /// deliberate extra spacing that `parse` throws away.
+    static func parseSpaced(_ text: String) -> [(block: MDBlock, blankLinesBefore: Int)] {
+        var blocks: [(block: MDBlock, blankLinesBefore: Int)] = []
         let lines = text.components(separatedBy: "\n")
         var i = 0
         var paragraph: [String] = []
+        var blank = 0
+        var paragraphBlank = 0
+
+        func append(_ block: MDBlock) {
+            blocks.append((block, blank))
+            blank = 0
+        }
 
         func flushParagraph() {
             guard !paragraph.isEmpty else { return }
-            let joined = paragraph.joined(separator: "\n")
-            blocks.append(.paragraph(joined))
+            blocks.append((.paragraph(paragraph.joined(separator: "\n")), paragraphBlank))
             paragraph = []
         }
 
@@ -37,6 +49,7 @@ enum MarkdownParser {
 
             if trimmed.isEmpty {
                 flushParagraph()
+                blank += 1
                 i += 1
                 continue
             }
@@ -51,27 +64,27 @@ enum MarkdownParser {
                     i += 1
                 }
                 i += 1
-                blocks.append(.code(language: lang.isEmpty ? nil : lang, code: codeLines.joined(separator: "\n")))
+                append(.code(language: lang.isEmpty ? nil : lang, code: codeLines.joined(separator: "\n")))
                 continue
             }
 
             if isRule(trimmed) {
                 flushParagraph()
-                blocks.append(.rule)
+                append(.rule)
                 i += 1
                 continue
             }
 
             if let (level, content) = heading(trimmed) {
                 flushParagraph()
-                blocks.append(.heading(level: level, text: content))
+                append(.heading(level: level, text: content))
                 i += 1
                 continue
             }
 
             if let img = standaloneImage(trimmed) {
                 flushParagraph()
-                blocks.append(.image(alt: img.alt, path: img.path))
+                append(.image(alt: img.alt, path: img.path))
                 i += 1
                 continue
             }
@@ -87,7 +100,7 @@ enum MarkdownParser {
                     quoteLines.append(content)
                     i += 1
                 }
-                blocks.append(.quote(quoteLines))
+                append(.quote(quoteLines))
                 continue
             }
 
@@ -108,10 +121,14 @@ enum MarkdownParser {
                         break
                     }
                 }
-                blocks.append(.list(ordered: ordered, items: items))
+                append(.list(ordered: ordered, items: items))
                 continue
             }
 
+            if paragraph.isEmpty {
+                paragraphBlank = blank
+                blank = 0
+            }
             paragraph.append(line)
             i += 1
         }
@@ -186,6 +203,19 @@ enum MarkdownParser {
         return imageRegex.matches(in: text, range: NSRange(location: 0, length: ns.length)).map {
             MDImage(alt: ns.substring(with: $0.range(at: 1)), path: ns.substring(with: $0.range(at: 2)))
         }
+    }
+
+    /// Removes the `index`-th `![]()` reference (in `images(in:)` order); a line left blank is removed with it.
+    static func removingImage(at index: Int, from text: String) -> String {
+        let ns = text as NSString
+        let matches = imageRegex.matches(in: text, range: NSRange(location: 0, length: ns.length))
+        guard matches.indices.contains(index) else { return text }
+        let match = matches[index].range
+        let line = ns.lineRange(for: match)
+        let rest = (ns.substring(with: line) as NSString)
+            .replacingCharacters(in: NSRange(location: match.location - line.location, length: match.length), with: "")
+        let cut = rest.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? line : match
+        return ns.replacingCharacters(in: cut, with: "")
     }
 
     static func listItem(_ t: String) -> (ordered: Bool, content: String)? {

@@ -10,6 +10,7 @@ enum LinkedInTheme {
     /// Desktop feed truncates after roughly this many characters with "…more".
     static let fold = 210
     static let columnWidth: CGFloat = 555
+    static let foldStyle = FoldMarkerStyle(label: "…more", labelBackground: .adaptive(light: 0xFFFFFF, dark: 0x1B1F23))
 
     /// LinkedIn has no bold/italic/strikethrough (Copy strips them too), so the card shows the text as it will post.
     static let editorTheme: EditorTheme = {
@@ -22,6 +23,7 @@ enum LinkedInTheme {
             lineHeightMultiple: 1.35
         )
         theme.rendersEmphasis = false
+        theme.rulesAsContinuationDots = true
         theme.headingFontOverride = { _ in .systemFont(ofSize: 14) }
         return theme
     }()
@@ -42,8 +44,8 @@ struct LinkedInFeedView: View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 VStack(spacing: 8) {
-                    composer
                     sortRow
+                    ghostPost(seed: 0, hasImage: false)
                     LinkedInPostCard(markdown: text, images: images, profile: profile, baseURL: baseURL,
                                      onEdit: { document.text = $0 })
                     ghostPost(seed: 1, hasImage: false)
@@ -60,33 +62,6 @@ struct LinkedInFeedView: View {
             }
             .padding(16)
         }
-    }
-
-    private var composer: some View {
-        card {
-            VStack(spacing: 10) {
-                HStack(spacing: 10) {
-                    AvatarView(profile: profile, size: 48)
-                    Text("Start a post")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(LinkedInTheme.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16).frame(height: 48)
-                        .overlay(Capsule().strokeBorder(LinkedInTheme.border))
-                }
-                HStack {
-                    ForEach(["photo.fill", "play.rectangle.fill", "doc.text.fill"], id: \.self) {
-                        Label($0 == "photo.fill" ? "Media" : $0 == "play.rectangle.fill" ? "Video" : "Write article", systemImage: $0)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(LinkedInTheme.secondary)
-                        Spacer()
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-            .padding(12)
-        }
-        .opacity(0.8)
     }
 
     private var sortRow: some View {
@@ -145,18 +120,13 @@ struct LinkedInPostCard: View {
             header.padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 8)
 
             PostEditor(text: markdown, theme: LinkedInTheme.editorTheme, documentURL: baseURL,
-                       foldAfter: LinkedInTheme.fold, takesFocusOnAppear: true, onChange: onEdit)
-                .overlay(alignment: .topLeading) {
-                    if markdown.isEmpty {
-                        Text("What do you want to talk about?")
-                            .font(.system(size: 14)).foregroundStyle(LinkedInTheme.secondary)
-                            .allowsHitTesting(false)
-                    }
-                }
+                       placeholder: "What do you want to talk about?",
+                       foldAfter: LinkedInTheme.fold, foldStyle: LinkedInTheme.foldStyle, takesFocusOnAppear: true, onChange: onEdit)
                 .padding(.horizontal, 16).padding(.bottom, 12)
 
             if !images.isEmpty {
-                MediaGrid(urls: images, cornerRadius: 0, singleAspect: nil, showsBorder: false)
+                MediaGrid(urls: images, cornerRadius: 0, singleAspect: nil, showsBorder: false,
+                          onRemove: { onEdit(MarkdownParser.removingImage(at: $0, from: markdown)) })
             }
 
             socialCounts.padding(.horizontal, 16).padding(.vertical, 8)

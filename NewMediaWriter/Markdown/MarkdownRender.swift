@@ -41,23 +41,45 @@ enum MarkdownRender {
     }
 
     /// LinkedIn has no formatting at all: bullets and line breaks survive, nothing else.
+    /// Deliberate extra blank lines between blocks are kept, as the feed shows them.
     static func plainText(_ text: String) -> String {
-        let blocks = MarkdownParser.parse(text)
-        var parts: [String] = []
-        for block in blocks {
+        joinBlocks(MarkdownParser.parseSpaced(text), separator: blankLines) { block in
             switch block {
-            case .heading(_, let t): parts.append(MarkdownInline.plainExposingLinks(t))
-            case .paragraph(let t): parts.append(MarkdownInline.plainExposingLinks(t))
-            case .quote(let lines): parts.append(lines.map { "“\(MarkdownInline.plainExposingLinks($0))”" }.joined(separator: "\n"))
-            case .code(_, let code): parts.append(code)
+            case .heading(_, let t): MarkdownInline.plainExposingLinks(t)
+            case .paragraph(let t): MarkdownInline.plainExposingLinks(t)
+            case .quote(let lines): lines.map { "“\(MarkdownInline.plainExposingLinks($0))”" }.joined(separator: "\n")
+            case .code(_, let code): code
             case .list(let ordered, let items):
-                parts.append(items.enumerated().map { i, item in
+                items.enumerated().map { i, item in
                     (ordered ? "\(i + 1). " : "• ") + MarkdownInline.plainExposingLinks(item)
-                }.joined(separator: "\n"))
-            case .image, .rule: break
+                }.joined(separator: "\n")
+            case .image, .rule: nil
             }
         }
-        return parts.joined(separator: "\n\n")
+    }
+
+    /// "\n" plus one more "\n" per blank line.
+    static func blankLines(_ count: Int) -> String {
+        String(repeating: "\n", count: count + 1)
+    }
+
+    /// Joins rendered blocks, putting `separator(n)` between them where n is the number of blank
+    /// source lines (at least one) before the next rendered block. Skipped blocks (nil) keep the larger gap.
+    static func joinBlocks(_ spaced: [(block: MDBlock, blankLinesBefore: Int)],
+                           separator: (Int) -> String,
+                           render: (MDBlock) -> String?) -> String {
+        var out = ""
+        var gap = 0
+        var first = true
+        for (block, before) in spaced {
+            gap = max(gap, before)
+            guard let piece = render(block) else { continue }
+            if !first { out += separator(max(1, gap)) }
+            out += piece
+            first = false
+            gap = 0
+        }
+        return out
     }
 
     /// Characters as X counts them (twitter-text v3): any URL is 23, emoji are 2,

@@ -9,7 +9,8 @@ enum XTheme {
     /// x.com truncates long (Premium) posts in the timeline after roughly this many characters.
     static let fold = 280
     static let foldStyle = FoldMarkerStyle(label: "Show more", labelColor: NSColor(blue),
-                                           lineColor: .adaptive(light: 0xEFF3F4, dark: 0x2F3336))
+                                           lineColor: .adaptive(light: 0xEFF3F4, dark: 0x2F3336),
+                                           labelBackground: .adaptive(light: 0xFFFFFF, dark: 0x000000))
     static let columnWidth: CGFloat = 600
 
     static let editorTheme = EditorTheme.post(
@@ -67,8 +68,10 @@ struct XPostFeedView: View {
     private var addToThreadRow: some View {
         Button {
             let trimmed = text.replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression)
+            // An empty thread has nothing to split; a lone `---` would just render inside the first post.
+            guard !trimmed.isEmpty else { focusedNewPost = 0; return }
             focusedNewPost = thread.count
-            document.text = trimmed.isEmpty ? "\n\n---\n\n" : trimmed + "\n\n---\n\n"
+            document.text = trimmed + "\n\n---\n\n"
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "plus.circle")
@@ -84,6 +87,9 @@ struct XPostFeedView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            (hovering ? NSCursor.pointingHand : NSCursor.arrow).set()
+        }
         .help("Add a post to the thread (inserts a --- separator)")
         .overlay(alignment: .bottom) { XTheme.border.frame(height: 1) }
     }
@@ -219,6 +225,7 @@ struct XPostCell: View {
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .pointingHandCursor()
                             .help("Copy post \(index + 1)")
                         }
                         Menu {
@@ -240,22 +247,18 @@ struct XPostCell: View {
                         .buttonStyle(.plain)
                         .menuIndicator(.hidden)
                         .fixedSize()
+                        .pointingHandCursor()
                     }
                     .font(.system(size: 15))
 
                     PostEditor(text: markdown, theme: XTheme.editorTheme, documentURL: baseURL,
+                               placeholder: index == 0 ? "What is happening?!" : "Post \(index + 1)…",
                                foldAfter: XTheme.fold, foldStyle: XTheme.foldStyle,
                                takesFocusOnAppear: takesFocus, onChange: onEdit)
-                        .overlay(alignment: .topLeading) {
-                            if markdown.isEmpty {
-                                Text(index == 0 ? "What is happening?!" : "Post \(index + 1)…")
-                                    .font(.system(size: 15)).foregroundStyle(XTheme.secondary)
-                                    .allowsHitTesting(false)
-                            }
-                        }
 
                     if !images.isEmpty {
-                        MediaGrid(urls: images, cornerRadius: 16)
+                        MediaGrid(urls: images, cornerRadius: 16,
+                                  onRemove: { onEdit(MarkdownParser.removingImage(at: $0, from: markdown)) })
                             .padding(.top, 4)
                     }
 

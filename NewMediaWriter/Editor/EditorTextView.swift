@@ -3,11 +3,15 @@ import UniformTypeIdentifiers
 
 /// NSTextView that keeps a centred reading column, hides markdown syntax away from the cursor,
 /// renders images below their `![]()` line and stores pasted/dropped images in `assets/`.
-/// How the timeline fold is drawn; nil colours fall back to the theme's secondary colour.
+/// How the timeline fold is drawn. The marker is an overlay: it never changes line or paragraph spacing.
 struct FoldMarkerStyle {
-    var label = "…more  ·  fold"
+    var label = "…more"
+    /// nil falls back to the theme's secondary colour.
     var labelColor: NSColor? = nil
+    /// Hairline across the column at the fold (X); nil draws no line (LinkedIn shows only the label).
     var lineColor: NSColor? = nil
+    /// Fill behind the label so it sits on top of the text; match the card colour.
+    var labelBackground: NSColor = .textBackgroundColor
 }
 
 final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDelegate {
@@ -72,11 +76,12 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     var topInset: CGFloat = 56
     /// Embedded in a feed card: no centred column, text spans the full frame width.
     var fillsWidth = false
+    var placeholder: String? { didSet { needsDisplay = true } }
     /// Feed cards show media in their own grid, so the editor skips inline image rendering.
     var showsImages = true { didSet { styler.revealsBrokenImages = showsImages } }
-    /// Draws a dashed fold line + label after this many visible (non-marker) characters.
-    var foldAfterVisibleCharacters: Int? { didSet { if oldValue != foldAfterVisibleCharacters { relayoutFold() } } }
-    var foldStyle = FoldMarkerStyle() { didSet { if oldValue.label != foldStyle.label { relayoutFold() } else { needsDisplay = true } } }
+    /// Overlays a fold marker after this many visible (non-marker) characters.
+    var foldAfterVisibleCharacters: Int? { didSet { if oldValue != foldAfterVisibleCharacters { refreshFold() } } }
+    var foldStyle = FoldMarkerStyle() { didSet { needsDisplay = true } }
     /// Embedded editors only reveal syntax in the cursor's paragraph while they have keyboard focus.
     var revealsMarkersOnlyWhenFocused = false
 
@@ -186,8 +191,9 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     override func didChangeText() {
         super.didChangeText()
         if let textStorage { styler.restyle(textStorage) }
+        matchEmptyCaretToPlaceholder()
         updateActiveParagraph(invalidate: true)
-        if foldAfterVisibleCharacters != nil { relayoutMovedFold() }
+        if foldAfterVisibleCharacters != nil { refreshFold() }
         needsImageLayout = true
         // Deferred: the popup queries layout, which must not happen while the edit is still being processed.
         DispatchQueue.main.async { [weak self] in self?.layoutImages(); self?.updateEmojiSuggestions() }
@@ -317,10 +323,22 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
             var r = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
             r.origin.y += origin.y
             let y = r.midY
+            if styler.theme.rulesAsContinuationDots {
+                styler.theme.secondary.withAlphaComponent(0.6).setFill()
+                let d: CGFloat = 3, gap: CGFloat = 5
+                let midX = origin.x + textContainer.containerSize.width / 2
+                for i in -1...1 {
+                    let x = midX + CGFloat(i) * (d + gap) - d / 2
+                    NSBezierPath(ovalIn: NSRect(x: x, y: y - d / 2, width: d, height: d)).fill()
+                }
+                return
+            }
             let line = NSRect(x: origin.x, y: y, width: textContainer.containerSize.width, height: 1)
             styler.theme.secondary.withAlphaComponent(0.35).setFill()
             NSBezierPath(rect: line).fill()
         }
+
+        drawFoldLine()
 
         textStorage.enumerateAttribute(.mdCodeBackground, in: full) { value, range, _ in
             guard value != nil else { return }
@@ -349,7 +367,34 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        if string.isEmpty, let placeholder {
+            let origin = textContainerOrigin
+            (placeholder as NSString).draw(
+                with: NSRect(x: origin.x, y: origin.y, width: columnWidth, height: bounds.height - origin.y),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: placeholderAttributes
+            )
+        }
         drawFoldMarker()
+    }
+
+    func placeholderHeight(for width: CGFloat) -> CGFloat {
+        guard let placeholder else { return 0 }
+        return ceil((placeholder as NSString).boundingRect(
+            with: NSSize(width: width, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: placeholderAttributes
+        ).height)
+    }
+
+    private var placeholderAttributes: [NSAttributedString.Key: Any] {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineHeightMultiple = styler.theme.lineHeightMultiple
+        return [
+            .font: styler.theme.body,
+            .foregroundColor: styler.theme.secondary,
+            .paragraphStyle: paragraph,
+        ]
     }
 
     private var foldLabel: NSString { foldStyle.label as NSString }
@@ -385,69 +430,53 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         return visible > fold ? lastShown : nil
     }
 
-    /// Height reserved below the folded line for the dashed rule and its label.
-    private var foldMarkerHeight: CGFloat { 6 + foldLabel.size(withAttributes: foldLabelAttributes).height }
-
-    /// The folded line gets extra height so the marker sits between lines instead of over the next one.
-    func layoutManager(_ layoutManager: NSLayoutManager, shouldSetLineFragmentRect lineFragmentRect: UnsafeMutablePointer<NSRect>, lineFragmentUsedRect: UnsafeMutablePointer<NSRect>, baselineOffset: UnsafeMutablePointer<CGFloat>, in textContainer: NSTextContainer, forGlyphRange glyphRange: NSRange) -> Bool {
-        guard let foldIndex = foldCharacterIndex() else { return false }
-        let chars = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
-        guard NSLocationInRange(foldIndex, chars) else { return false }
-        lineFragmentRect.pointee.size.height += foldMarkerHeight
-        return true
-    }
-
-    /// Fold settings changed: every line may gain or lose the marker's height.
-    private func relayoutFold() {
+    /// Fold moved, appeared or vanished: only repaint. The marker is drawn over the text, so layout never changes.
+    private func refreshFold() {
         foldIndexCache = nil
         needsDisplay = true
-        guard let layoutManager, let textStorage, textStorage.length > 0 else { return }
-        layoutManager.invalidateLayout(forCharacterRange: NSRange(location: 0, length: textStorage.length), actualCharacterRange: nil)
     }
 
-    /// After an edit the fold may sit on a different line; relayout both so only the new one carries the extra height.
-    private func relayoutMovedFold() {
-        guard let layoutManager, let textStorage else { return }
-        let old = foldIndexCache ?? nil
-        foldIndexCache = nil
-        let new = foldCharacterIndex()
-        needsDisplay = true
-        guard old != new else { return }
-        let string = textStorage.string as NSString
-        for index in [old, new].compactMap({ $0 }) where index < string.length {
-            layoutManager.invalidateLayout(forCharacterRange: string.paragraphRange(for: NSRange(location: index, length: 0)), actualCharacterRange: nil)
-        }
+    /// Where the marker goes, in view coordinates. `y` is the middle of the gap under the line holding the last
+    /// shown character (where the X hairline runs). The label sits at the trailing edge: on the folded line when
+    /// that line ends early enough, otherwise centred in the gap between the two lines' glyphs.
+    private func foldGeometry() -> (y: CGFloat, label: NSRect)? {
+        guard let layoutManager, let textContainer, let foldIndex = foldCharacterIndex() else { return nil }
+        let glyph = layoutManager.glyphIndexForCharacter(at: foldIndex)
+        let fragment = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+        let used = layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
+        let origin = textContainerOrigin
+        let boundary = origin.y + fragment.maxY
+        let size = foldLabel.size(withAttributes: foldLabelAttributes)
+        let width = ceil(size.width) + 12, height = ceil(size.height) + 1
+        let right = origin.x + textContainer.containerSize.width
+        let font = styler.theme.body
+        let descent = -font.descender
+        let extra = max(0, fragment.height - (font.ascender - font.descender + font.leading))
+        let gap = ((boundary - descent) + (boundary + extra + font.ascender - font.capHeight)) / 2
+        let fitsOnLine = origin.x + used.maxX + 8 <= right - width
+        let centre = fitsOnLine ? boundary - descent - font.capHeight / 2 : gap
+        return (gap.rounded(), NSRect(x: right - width, y: (centre - height / 2).rounded(), width: width, height: height))
     }
 
     /// Bottom edge of the fold label in text-container coordinates, so hosts sizing to content can reserve room for it.
     var foldMarkerBottom: CGFloat? {
-        guard let layoutManager, let foldIndex = foldCharacterIndex() else { return nil }
-        let glyph = layoutManager.glyphIndexForCharacter(at: foldIndex)
-        let line = layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
-        return line.maxY + 4 + foldLabel.size(withAttributes: foldLabelAttributes).height
+        guard let geometry = foldGeometry() else { return nil }
+        return geometry.label.maxY - textContainerOrigin.y
+    }
+
+    /// Hairline under the text (drawn from `drawBackground`) so glyphs stay on top of it.
+    private func drawFoldLine() {
+        guard let color = foldStyle.lineColor, let geometry = foldGeometry() else { return }
+        color.setFill()
+        let x = textContainerOrigin.x
+        NSBezierPath(rect: NSRect(x: x, y: geometry.y - 0.5, width: geometry.label.minX - 6 - x, height: 1)).fill()
     }
 
     private func drawFoldMarker() {
-        guard let layoutManager, let textContainer, let foldIndex = foldCharacterIndex() else { return }
-        let glyph = layoutManager.glyphIndexForCharacter(at: foldIndex)
-        var line = layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
-        let origin = textContainerOrigin
-        line.origin.x += origin.x
-        line.origin.y += origin.y
-        let y = line.maxY + 2
-        let width = textContainer.containerSize.width
-
-        let path = NSBezierPath()
-        path.move(to: NSPoint(x: origin.x, y: y))
-        path.line(to: NSPoint(x: origin.x + width, y: y))
-        path.lineWidth = 1
-        path.setLineDash([4, 4], count: 2, phase: 0)
-        (foldStyle.lineColor ?? styler.theme.secondary.withAlphaComponent(0.7)).setStroke()
-        path.stroke()
-
-        let attrs = foldLabelAttributes
-        let size = foldLabel.size(withAttributes: attrs)
-        foldLabel.draw(at: NSPoint(x: origin.x + width - size.width, y: y + 2), withAttributes: attrs)
+        guard let geometry = foldGeometry() else { return }
+        foldStyle.labelBackground.setFill()
+        NSBezierPath(roundedRect: geometry.label, xRadius: geometry.label.height / 2, yRadius: geometry.label.height / 2).fill()
+        foldLabel.draw(at: NSPoint(x: geometry.label.minX + 6, y: geometry.label.minY + 0.5), withAttributes: foldLabelAttributes)
     }
 
     // MARK: - Images
@@ -469,9 +498,19 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     func restyleAndRelayout() {
         guard let textStorage else { return }
         styler.restyle(textStorage)
+        matchEmptyCaretToPlaceholder()
         foldIndexCache = nil
         needsImageLayout = true
         layoutImages()
+    }
+
+    /// An empty view has no text to carry the theme's font/line height, so the caret would use the
+    /// system defaults and sit above the placeholder.
+    private func matchEmptyCaretToPlaceholder() {
+        guard string.isEmpty else { return }
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineHeightMultiple = styler.theme.lineHeightMultiple
+        typingAttributes = [.font: styler.theme.body, .foregroundColor: styler.theme.text, .paragraphStyle: paragraph]
     }
 
     private var isLayingOutImages = false
@@ -553,7 +592,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     override func readSelection(from pboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
         // A drag carrying both text and an image still reaches a card editor; append the image like the card does.
-        if !acceptsImageDrops, ImageStore.hasImages(on: pboard) {
+        if !acceptsImageDrops, ImageStore.hasMedia(on: pboard) {
             setSelectedRange(NSRange(location: (string as NSString).length, length: 0))
         }
         if insertImages(from: pboard) { return true }
@@ -610,12 +649,12 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     @discardableResult
     private func insertImages(from pboard: NSPasteboard) -> Bool {
-        guard ImageStore.hasImages(on: pboard) else { return false }
+        guard ImageStore.hasMedia(on: pboard) else { return false }
         guard let documentURL else {
             ImageStore.promptToSave(in: window)
             return true
         }
-        guard let paths = ImageStore(documentURL: documentURL).storeImages(from: pboard) else { return false }
+        guard let paths = ImageStore(documentURL: documentURL).storeMedia(from: pboard) else { return false }
         insertImageMarkdown(paths: paths)
         return true
     }
