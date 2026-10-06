@@ -214,6 +214,7 @@ struct CopyButton: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .pointingHandCursor()
             .help("Copy for this view (⇧⌘C)")
 
             if !alternatives.isEmpty {
@@ -231,6 +232,7 @@ struct CopyButton: View {
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
                 .fixedSize()
+                .pointingHandCursor()
                 .padding(.leading, 4)
             }
         }
@@ -248,6 +250,18 @@ struct CopyButton: View {
         make().copy()
         copied = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
+    }
+}
+
+extension View {
+    /// Pointing-hand cursor while hovering a clickable control.
+    func pointingHandCursor() -> some View {
+        onContinuousHover { phase in
+            switch phase {
+            case .active: NSCursor.pointingHand.set()
+            case .ended: NSCursor.arrow.set()
+            }
+        }
     }
 }
 

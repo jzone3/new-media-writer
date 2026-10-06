@@ -226,6 +226,7 @@ struct XPostCell: View {
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .pointingHandCursor()
                             .help("Copy post \(index + 1)")
                         }
                         Menu {
@@ -247,6 +248,7 @@ struct XPostCell: View {
                         .buttonStyle(.plain)
                         .menuIndicator(.hidden)
                         .fixedSize()
+                        .pointingHandCursor()
                     }
                     .font(.system(size: 15))
 
