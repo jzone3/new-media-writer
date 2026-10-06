@@ -5,12 +5,15 @@ import AppKit
 enum PDFRender {
     static let bodySize: CGFloat = 12
 
-    /// `resolveImage` turns a Markdown image path into a local file URL (nil to skip).
-    static func attributed(_ text: String, contentWidth: CGFloat, resolveImage: (String) -> URL?) -> NSAttributedString {
+    /// `resolveImage` turns a Markdown image path into a file or http(s) URL (nil to skip).
+    /// Images are scaled to fit `contentWidth` × `contentHeight` (one printable page): an attachment can't
+    /// be split across pages, so anything taller would be cut off.
+    static func attributed(_ text: String, contentWidth: CGFloat, contentHeight: CGFloat = .greatestFiniteMagnitude,
+                           resolveImage: (String) -> URL?) -> NSAttributedString {
         let out = NSMutableAttributedString()
         let blocks = MarkdownParser.parse(text)
         for block in blocks {
-            let piece = render(block, contentWidth: contentWidth, resolveImage: resolveImage)
+            let piece = render(block, contentWidth: contentWidth, contentHeight: contentHeight, resolveImage: resolveImage)
             guard piece.length > 0 else { continue }
             if out.length > 0 { out.append(NSAttributedString(string: "\n", attributes: lastAttributes(of: out))) }
             out.append(piece)
@@ -20,7 +23,7 @@ enum PDFRender {
 
     // MARK: Blocks
 
-    private static func render(_ block: MDBlock, contentWidth: CGFloat, resolveImage: (String) -> URL?) -> NSAttributedString {
+    private static func render(_ block: MDBlock, contentWidth: CGFloat, contentHeight: CGFloat, resolveImage: (String) -> URL?) -> NSAttributedString {
         switch block {
         case .heading(let level, let t):
             let size: CGFloat = switch level { case 1: 24; case 2: 18; case 3: 14.5; default: bodySize }
@@ -58,12 +61,13 @@ enum PDFRender {
             }
             return out
         case .image(let alt, let path):
-            guard let url = resolveImage(path), url.isFileURL, let image = NSImage(contentsOf: url), image.size.width > 0 else {
+            guard let url = resolveImage(path), let image = loadImage(url), image.size.width > 0, image.size.height > 0 else {
                 return alt.isEmpty ? NSAttributedString() : inline(alt, font: body, style: paragraph(spacing: 10), color: .init(white: 0.5, alpha: 1))
             }
             let attachment = NSTextAttachment()
             attachment.image = image
-            let scale = min(1, contentWidth / image.size.width)
+            // Leave room under the image for its paragraph spacing so it never overflows the page on its own.
+            let scale = min(1, contentWidth / image.size.width, (contentHeight - 20) / image.size.height)
             attachment.bounds = CGRect(x: 0, y: 0, width: floor(image.size.width * scale), height: floor(image.size.height * scale))
             let out = NSMutableAttributedString(attachment: attachment)
             out.addAttributes([.paragraphStyle: paragraph(spacing: 10), .font: body], range: NSRange(location: 0, length: out.length))
@@ -80,6 +84,19 @@ enum PDFRender {
             out.addAttributes([.paragraphStyle: paragraph(spacingBefore: 6, spacing: 14), .font: body], range: NSRange(location: 0, length: out.length))
             return out
         }
+    }
+
+    /// Local files load directly; remote images (shown in the previews too) are fetched with a short timeout
+    /// so a dead link can't hang the export.
+    private static func loadImage(_ url: URL) -> NSImage? {
+        if url.isFileURL { return NSImage(contentsOf: url) }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 8
+        var result: Data?
+        let done = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: request) { data, _, _ in result = data; done.signal() }.resume()
+        done.wait()
+        return result.flatMap(NSImage.init(data:))
     }
 
     // MARK: Inline

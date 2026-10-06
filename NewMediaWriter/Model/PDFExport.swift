@@ -39,7 +39,11 @@ enum PDFExport {
         info.dictionary()[NSPrintInfo.AttributeKey.jobSavingURL] = url
 
         let width = info.paperSize.width - info.leftMargin - info.rightMargin
-        let storage = NSTextStorage(attributedString: PDFRender.attributed(text, contentWidth: width) { ImagePathResolver.resolve($0, relativeTo: baseURL) })
+        let height = info.paperSize.height - info.topMargin - info.bottomMargin
+        let rendered = PDFRender.attributed(text, contentWidth: width, contentHeight: height) {
+            ImagePathResolver.resolve($0, relativeTo: baseURL)
+        }
+        let storage = NSTextStorage(attributedString: rendered)
         let layout = NSLayoutManager()
         let container = NSTextContainer(size: CGSize(width: width, height: .greatestFiniteMagnitude))
         container.lineFragmentPadding = 0

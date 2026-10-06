@@ -62,6 +62,13 @@ pdf.enumerateAttributes(in: NSRange(location: 0, length: pdf.length)) { attrs, r
 }
 expect("pdf render styles heading, link and code", "\(sawH1) \(sawLink) \(sawMono)", "true true true")
 
+let tallPNG = FileManager.default.temporaryDirectory.appendingPathComponent("nmw-tall.png")
+let tall = NSImage(size: NSSize(width: 200, height: 2000), flipped: false) { r in NSColor.black.setFill(); r.fill(); return true }
+try! NSBitmapImageRep(data: tall.tiffRepresentation!)!.representation(using: .png, properties: [:])!.write(to: tallPNG)
+let tallDoc = PDFRender.attributed("![t](tall.png)", contentWidth: 468, contentHeight: 648) { _ in tallPNG }
+let bounds = (tallDoc.attribute(.attachment, at: 0, effectiveRange: nil) as? NSTextAttachment)?.bounds ?? .zero
+expect("pdf render fits a tall image on one page", "\(Int(bounds.width))x\(Int(bounds.height))", "62x628")
+
 if failures > 0 {
     print("\(failures) failed")
     exit(1)
