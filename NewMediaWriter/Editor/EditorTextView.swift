@@ -582,7 +582,13 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     static func firstVisible(in root: NSView) -> EditorTextView? {
         var all: [EditorTextView] = []
         collectEditors(in: root, into: &all)
-        return all.first { !$0.visibleRect.isEmpty } ?? all.first
+        // SwiftUI's ScrollView clips without NSClipView, so `visibleRect` is useless here; test the
+        // editor's frame in the window's content coordinates instead (convert accounts for scrolling).
+        let onScreen = all.first { editor in
+            let frame = editor.convert(editor.bounds, to: root)
+            return frame.intersects(root.bounds) && frame.height > 0
+        }
+        return onScreen ?? all.first
     }
 
     private static func collectEditors(in view: NSView, into result: inout [EditorTextView]) {
