@@ -577,13 +577,17 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         return rich?.string
     }
 
-    /// The first on-screen editor under `root`, used to route ⌘V when nothing in the window has focus.
+    /// The first editor under `root` that is actually on screen (not hidden, not scrolled out of view),
+    /// used to route ⌘V when nothing in the window has focus. Falls back to the first editor at all.
     static func firstVisible(in root: NSView) -> EditorTextView? {
-        if let editor = root as? EditorTextView, !editor.isHiddenOrHasHiddenAncestor { return editor }
-        for sub in root.subviews {
-            if let editor = firstVisible(in: sub) { return editor }
-        }
-        return nil
+        var all: [EditorTextView] = []
+        collectEditors(in: root, into: &all)
+        return all.first { !$0.visibleRect.isEmpty } ?? all.first
+    }
+
+    private static func collectEditors(in view: NSView, into result: inout [EditorTextView]) {
+        if let editor = view as? EditorTextView, !editor.isHiddenOrHasHiddenAncestor { result.append(editor) }
+        for sub in view.subviews { collectEditors(in: sub, into: &result) }
     }
 
     override func pasteAsPlainText(_ sender: Any?) { paste(sender) }
