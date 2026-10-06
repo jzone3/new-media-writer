@@ -48,6 +48,27 @@ expect("x html unchanged", x.html, doc(
     "<p>Line one<br>line two</p><p><b>Bold</b> and <i>it</i></p><p>After three blanks</p><p>• a<br>• b</p>"
     + "<p>“quote”</p><p>code</p><p>more</p><p>End</p>"))
 
+// PDF document render: block structure as text (attachments are U+FFFC), images resolved through the caller.
+let pdfSource = "# Title\n\nPara **bold** [link](https://x.y)\nsoft break\n\n- a\n- b\n\n1. one\n\n> q1\n> q2\n\n```\ncode\n```\n\n![alt](assets/missing.png)\n\n---\n\nEnd"
+let pdf = PDFRender.attributed(pdfSource, contentWidth: 468) { _ in nil }
+expect("pdf render keeps block order and list markers", pdf.string,
+       "Title\nPara bold link\u{2028}soft break\n•\ta\n•\tb\n1.\tone\nq1\u{2028}q2\ncode\nalt\n\u{FFFC}\nEnd")
+var sawH1 = false, sawLink = false, sawMono = false
+pdf.enumerateAttributes(in: NSRange(location: 0, length: pdf.length)) { attrs, range, _ in
+    let s = (pdf.string as NSString).substring(with: range)
+    if s.hasPrefix("Title"), let f = attrs[.font] as? NSFont, f.pointSize == 24 { sawH1 = true }
+    if s == "link", attrs[.link] != nil { sawLink = true }
+    if s.hasPrefix("code"), let f = attrs[.font] as? NSFont, f.fontDescriptor.symbolicTraits.contains(.monoSpace) { sawMono = true }
+}
+expect("pdf render styles heading, link and code", "\(sawH1) \(sawLink) \(sawMono)", "true true true")
+
+let tallPNG = FileManager.default.temporaryDirectory.appendingPathComponent("nmw-tall.png")
+let tall = NSImage(size: NSSize(width: 200, height: 2000), flipped: false) { r in NSColor.black.setFill(); r.fill(); return true }
+try! NSBitmapImageRep(data: tall.tiffRepresentation!)!.representation(using: .png, properties: [:])!.write(to: tallPNG)
+let tallDoc = PDFRender.attributed("![t](tall.png)", contentWidth: 468, contentHeight: 648) { _ in tallPNG }
+let bounds = (tallDoc.attribute(.attachment, at: 0, effectiveRange: nil) as? NSTextAttachment)?.bounds ?? .zero
+expect("pdf render fits a tall image on one page", "\(Int(bounds.width))x\(Int(bounds.height))", "62x628")
+
 if failures > 0 {
     print("\(failures) failed")
     exit(1)

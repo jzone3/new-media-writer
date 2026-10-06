@@ -17,6 +17,7 @@ struct NewMediaWriterApp: App {
         .commands {
             UpdateCommands()
             ViewCommands()
+            ExportCommands()
         }
 
         Settings {
