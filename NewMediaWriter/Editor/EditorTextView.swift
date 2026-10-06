@@ -538,8 +538,10 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     // MARK: - Paste & drop
 
+    // Rich types are listed so Paste validates (and ⌘V fires) for an RTF/HTML-only pasteboard;
+    // they are pasted as their plain text, see `plainText(on:)`.
     override var readablePasteboardTypes: [NSPasteboard.PasteboardType] {
-        [.fileURL, .png, .tiff, .string]
+        [.fileURL, .png, .tiff, .string, .rtf, .rtfd, .html]
     }
 
     /// Feed cards take image drops anywhere on the card, so their editors only accept text drags.
@@ -555,7 +557,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
             setSelectedRange(NSRange(location: (string as NSString).length, length: 0))
         }
         if insertImages(from: pboard) { return true }
-        if type == .string, let s = pboard.string(forType: .string) {
+        if [.string, .rtf, .rtfd, .html].contains(type), let s = EditorTextView.plainText(on: pboard) {
             insertText(s, replacementRange: selectedRange())
             return true
         }
