@@ -9,7 +9,8 @@ enum XTheme {
     /// x.com truncates long (Premium) posts in the timeline after roughly this many characters.
     static let fold = 280
     static let foldStyle = FoldMarkerStyle(label: "Show more", labelColor: NSColor(blue),
-                                           lineColor: .adaptive(light: 0xEFF3F4, dark: 0x2F3336))
+                                           lineColor: .adaptive(light: 0xEFF3F4, dark: 0x2F3336),
+                                           labelBackground: .adaptive(light: 0xFFFFFF, dark: 0x000000))
     static let columnWidth: CGFloat = 600
 
     static let editorTheme = EditorTheme.post(

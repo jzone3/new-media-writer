@@ -10,14 +10,18 @@ enum SlackTheme {
     static let codeBackground = Color.adaptive(light: 0xF8F8F8, dark: 0x222529)
     static let limit = 40_000
 
-    static let editorTheme = EditorTheme.post(
-        size: 15,
-        text: .adaptive(light: 0x1D1C1D, dark: 0xD1D2D3),
-        secondary: .adaptive(light: 0x616061, dark: 0xABABAD),
-        accent: NSColor(Color(hex: 0x1264A3)),
-        codeBackground: .adaptive(light: 0xF8F8F8, dark: 0x222529),
-        lineHeightMultiple: 1.45
-    )
+    static let editorTheme: EditorTheme = {
+        var theme = EditorTheme.post(
+            size: 15,
+            text: .adaptive(light: 0x1D1C1D, dark: 0xD1D2D3),
+            secondary: .adaptive(light: 0x616061, dark: 0xABABAD),
+            accent: NSColor(Color(hex: 0x1264A3)),
+            codeBackground: .adaptive(light: 0xF8F8F8, dark: 0x222529),
+            lineHeightMultiple: 1.45
+        )
+        theme.rulesAsContinuationDots = true
+        return theme
+    }()
 }
 
 struct SlackView: View {

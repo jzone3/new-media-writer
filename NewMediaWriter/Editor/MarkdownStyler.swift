@@ -26,6 +26,9 @@ struct EditorTheme {
     var headingFontOverride: ((Int) -> NSFont)? = nil
     /// False for platforms with no inline formatting (LinkedIn): markers still hide, but bold/italic/strike/code stay regular text.
     var rendersEmphasis = true
+    /// Draw `---` as a centred three-dot continuation instead of a full-width line. LinkedIn and Slack have no
+    /// rules; there `---` only separates X thread posts, so a divider line would look like an X thread.
+    var rulesAsContinuationDots = false
 
     static let wysiwyg = EditorTheme(
         body: .systemFont(ofSize: 17, weight: .regular),

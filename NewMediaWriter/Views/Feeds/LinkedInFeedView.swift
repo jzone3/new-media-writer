@@ -10,6 +10,7 @@ enum LinkedInTheme {
     /// Desktop feed truncates after roughly this many characters with "…more".
     static let fold = 210
     static let columnWidth: CGFloat = 555
+    static let foldStyle = FoldMarkerStyle(label: "…more", labelBackground: .adaptive(light: 0xFFFFFF, dark: 0x1B1F23))
 
     /// LinkedIn has no bold/italic/strikethrough (Copy strips them too), so the card shows the text as it will post.
     static let editorTheme: EditorTheme = {
@@ -22,6 +23,7 @@ enum LinkedInTheme {
             lineHeightMultiple: 1.35
         )
         theme.rendersEmphasis = false
+        theme.rulesAsContinuationDots = true
         theme.headingFontOverride = { _ in .systemFont(ofSize: 14) }
         return theme
     }()
@@ -146,7 +148,7 @@ struct LinkedInPostCard: View {
 
             PostEditor(text: markdown, theme: LinkedInTheme.editorTheme, documentURL: baseURL,
                        placeholder: "What do you want to talk about?",
-                       foldAfter: LinkedInTheme.fold, takesFocusOnAppear: true, onChange: onEdit)
+                       foldAfter: LinkedInTheme.fold, foldStyle: LinkedInTheme.foldStyle, takesFocusOnAppear: true, onChange: onEdit)
                 .padding(.horizontal, 16).padding(.bottom, 12)
 
             if !images.isEmpty {
