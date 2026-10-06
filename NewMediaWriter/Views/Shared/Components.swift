@@ -200,7 +200,7 @@ struct MediaGrid: View {
         let url: URL?
         var body: some View {
             if ImageStore.isVideo(url), let url {
-                SingleVideo(url: url)
+                SingleVideo(url: url).id(FileIdentity(url))
             } else if let url, let image = ImageCache.shared.image(for: url), image.size.height > 0 {
                 let ratio = image.size.width / image.size.height
                 if ratio < 0.8 {

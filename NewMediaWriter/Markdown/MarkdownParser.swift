@@ -195,7 +195,8 @@ enum MarkdownParser {
         guard matches.indices.contains(index) else { return text }
         let match = matches[index].range
         let line = ns.lineRange(for: match)
-        let rest = ns.substring(with: line).replacingOccurrences(of: ns.substring(with: match), with: "")
+        let rest = (ns.substring(with: line) as NSString)
+            .replacingCharacters(in: NSRange(location: match.location - line.location, length: match.length), with: "")
         let cut = rest.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? line : match
         return ns.replacingCharacters(in: cut, with: "")
     }
