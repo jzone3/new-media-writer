@@ -33,6 +33,7 @@ struct ContentView: View {
         .ignoresSafeArea()
         .focusedSceneValue(\.viewMode, $mode)
         .focusedSceneValue(\.viewPickerShown, $pickerShown)
+        .focusedSceneValue(\.pdfExport, PDFExportContext(document: document, fileURL: fileURL))
         .animation(.easeOut(duration: 0.12), value: pickerShown)
         .animation(.easeOut(duration: 0.15), value: mode)
         .onChange(of: mode) { _, new in ViewMode.lastUsed = new }

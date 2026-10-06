@@ -48,6 +48,20 @@ expect("x html unchanged", x.html, doc(
     "<p>Line one<br>line two</p><p><b>Bold</b> and <i>it</i></p><p>After three blanks</p><p>• a<br>• b</p>"
     + "<p>“quote”</p><p>code</p><p>more</p><p>End</p>"))
 
+// PDF document render: block structure as text (attachments are U+FFFC), images resolved through the caller.
+let pdfSource = "# Title\n\nPara **bold** [link](https://x.y)\nsoft break\n\n- a\n- b\n\n1. one\n\n> q1\n> q2\n\n```\ncode\n```\n\n![alt](assets/missing.png)\n\n---\n\nEnd"
+let pdf = PDFRender.attributed(pdfSource, contentWidth: 468) { _ in nil }
+expect("pdf render keeps block order and list markers", pdf.string,
+       "Title\nPara bold link\u{2028}soft break\n•\ta\n•\tb\n1.\tone\nq1\u{2028}q2\ncode\nalt\n\u{FFFC}\nEnd")
+var sawH1 = false, sawLink = false, sawMono = false
+pdf.enumerateAttributes(in: NSRange(location: 0, length: pdf.length)) { attrs, range, _ in
+    let s = (pdf.string as NSString).substring(with: range)
+    if s.hasPrefix("Title"), let f = attrs[.font] as? NSFont, f.pointSize == 24 { sawH1 = true }
+    if s == "link", attrs[.link] != nil { sawLink = true }
+    if s.hasPrefix("code"), let f = attrs[.font] as? NSFont, f.fontDescriptor.symbolicTraits.contains(.monoSpace) { sawMono = true }
+}
+expect("pdf render styles heading, link and code", "\(sawH1) \(sawLink) \(sawMono)", "true true true")
+
 if failures > 0 {
     print("\(failures) failed")
     exit(1)
