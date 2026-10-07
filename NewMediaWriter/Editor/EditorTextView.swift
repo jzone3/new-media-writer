@@ -118,7 +118,16 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     override func becomeFirstResponder() -> Bool {
         let ok = super.becomeFirstResponder()
         if ok, revealsMarkersOnlyWhenFocused { invalidateGlyphs(in: activeParagraph) }
+        if ok { nudgeCaretOutOfHiddenImageLines() }
         return ok
+    }
+
+    /// `PostEditor` sets the text and caret before the first restyle, when no `.mdImage` attribute exists yet,
+    /// so the selection hook above can't see the image line: re-check once the styling is in place.
+    private func nudgeCaretOutOfHiddenImageLines() {
+        let current = [NSValue(range: selectedRange())]
+        let fixed = caretOutsideHiddenImageLines(current)
+        if fixed != current { setSelectedRanges(fixed, affinity: .downstream, stillSelecting: false) }
     }
 
     override func resignFirstResponder() -> Bool {
@@ -529,6 +538,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         guard let textStorage else { return }
         styler.restyle(textStorage)
         matchEmptyCaretToPlaceholder()
+        nudgeCaretOutOfHiddenImageLines()
         foldIndexCache = nil
         needsImageLayout = true
         layoutImages()
