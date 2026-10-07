@@ -45,7 +45,6 @@ enum Welcome {
 
 private struct WelcomeView: View {
     @State private var window: NSWindow?
-    @State private var hoveringLink = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -64,38 +63,33 @@ private struct WelcomeView: View {
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.bottom, 8)
-            Button {
-                NSWorkspace.shared.open(Welcome.repoURL)
-            } label: {
-                Text("github.com/jzone3/new-media-writer")
-                    .font(.system(size: 13, weight: .medium, design: .monospaced))
-                    .underline(hoveringLink)
-                    .foregroundStyle(hoveringLink ? .primary : .secondary)
+                .padding(.bottom, 28)
+            HStack(spacing: 10) {
+                pill("GitHub", filled: false) { NSWorkspace.shared.open(Welcome.repoURL) }
+                pill("Let's Write", filled: true) { Welcome.dismiss(window) }
+                    .keyboardShortcut(.defaultAction)
             }
-            .buttonStyle(.plain)
-            .pointingHandCursor()
-            .onHover { hoveringLink = $0 }
-            .padding(.bottom, 28)
-            Button {
-                Welcome.dismiss(window)
-            } label: {
-                Text("OK")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color(nsColor: .windowBackgroundColor))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 40)
-                    .background(Color.primary, in: Capsule())
-            }
-            .buttonStyle(.plain)
-            .pointingHandCursor()
-            .keyboardShortcut(.defaultAction)
         }
         .padding(.horizontal, 36)
         .padding(.top, 36)
         .padding(.bottom, 28)
         .frame(width: 400)
         .background(WindowReader { window = $0 })
+    }
+
+    private func pill(_ title: String, filled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundStyle(filled ? Color(nsColor: .windowBackgroundColor) : Color.primary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+                .background(filled ? Color.primary : Color.clear, in: Capsule())
+                .overlay(Capsule().strokeBorder(Color.primary.opacity(filled ? 0 : 0.25), lineWidth: 1))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .pointingHandCursor()
     }
 }
 
