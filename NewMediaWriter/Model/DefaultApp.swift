@@ -78,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             NSDocumentController.shared.newDocument(nil)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            Welcome.showIfNeeded()
             DefaultApp.promptIfNeeded()
         }
         UpdateChecker.shared.checkOnLaunch()
