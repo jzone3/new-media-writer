@@ -103,11 +103,14 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     /// Card editors keep image lines hidden, so the caret must not land inside one (typing there would be
     /// invisible): a collapsed selection in a hidden image line moves to the end of the previous line.
     private func caretOutsideHiddenImageLines(_ ranges: [NSValue]) -> [NSValue] {
-        guard !showsImages, ranges.count == 1, let textStorage, let sel = ranges.first?.rangeValue, sel.length == 0,
-              sel.location < textStorage.length,
-              textStorage.attribute(.mdImage, at: sel.location, effectiveRange: nil) != nil else { return ranges }
+        guard !showsImages, ranges.count == 1, let textStorage, let sel = ranges.first?.rangeValue, sel.length == 0 else { return ranges }
         let string = textStorage.string as NSString
-        let paragraph = string.paragraphRange(for: sel)
+        let paragraph = string.paragraphRange(for: NSRange(location: min(sel.location, string.length), length: 0))
+        func isImage(_ i: Int) -> Bool {
+            i >= 0 && i < string.length && textStorage.attribute(.mdImage, at: i, effectiveRange: nil) != nil
+        }
+        // The attribute covers the line's text, not its newline: also catch the caret right after the closing `)`.
+        guard isImage(sel.location) || (sel.location > paragraph.location && isImage(sel.location - 1)) else { return ranges }
         let location = paragraph.location > 0 ? paragraph.location - 1 : NSMaxRange(paragraph)
         return [NSValue(range: NSRange(location: min(location, string.length), length: 0))]
     }
