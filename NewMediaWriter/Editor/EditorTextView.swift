@@ -89,10 +89,45 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         !revealsMarkersOnlyWhenFocused || window?.firstResponder === self
     }
 
+    /// Whether the syntax at `charIndex` is shown because the cursor is in its paragraph. Card editors
+    /// (`showsImages == false`) never reveal an image line: the card's media grid is the image.
+    private func revealsSyntax(at charIndex: Int) -> Bool {
+        guard revealsActiveParagraph, NSLocationInRange(charIndex, activeParagraph) else { return false }
+        if !showsImages, let textStorage, charIndex < textStorage.length,
+           textStorage.attribute(.mdImage, at: charIndex, effectiveRange: nil) != nil {
+            return false
+        }
+        return true
+    }
+
+    /// Card editors keep image lines hidden, so the caret must not land inside one (typing there would be
+    /// invisible): a collapsed selection in a hidden image line moves to the end of the previous line.
+    private func caretOutsideHiddenImageLines(_ ranges: [NSValue]) -> [NSValue] {
+        guard !showsImages, ranges.count == 1, let textStorage, let sel = ranges.first?.rangeValue, sel.length == 0 else { return ranges }
+        let string = textStorage.string as NSString
+        let paragraph = string.paragraphRange(for: NSRange(location: min(sel.location, string.length), length: 0))
+        func isImage(_ i: Int) -> Bool {
+            i >= 0 && i < string.length && textStorage.attribute(.mdImage, at: i, effectiveRange: nil) != nil
+        }
+        // The attribute covers the line's text, not its newline: also catch the caret right after the closing `)`.
+        guard isImage(sel.location) || (sel.location > paragraph.location && isImage(sel.location - 1)) else { return ranges }
+        let location = paragraph.location > 0 ? paragraph.location - 1 : NSMaxRange(paragraph)
+        return [NSValue(range: NSRange(location: min(location, string.length), length: 0))]
+    }
+
     override func becomeFirstResponder() -> Bool {
         let ok = super.becomeFirstResponder()
         if ok, revealsMarkersOnlyWhenFocused { invalidateGlyphs(in: activeParagraph) }
+        if ok { nudgeCaretOutOfHiddenImageLines() }
         return ok
+    }
+
+    /// `PostEditor` sets the text and caret before the first restyle, when no `.mdImage` attribute exists yet,
+    /// so the selection hook above can't see the image line: re-check once the styling is in place.
+    private func nudgeCaretOutOfHiddenImageLines() {
+        let current = [NSValue(range: selectedRange())]
+        let fixed = caretOutsideHiddenImageLines(current)
+        if fixed != current { setSelectedRanges(fixed, affinity: .downstream, stillSelecting: false) }
     }
 
     override func resignFirstResponder() -> Bool {
@@ -200,7 +235,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     }
 
     override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
-        super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
+        super.setSelectedRanges(caretOutsideHiddenImageLines(ranges), affinity: affinity, stillSelecting: stillSelecting)
         updateActiveParagraph(invalidate: true)
         if emojiPopup.isVisible && !stillSelecting {
             DispatchQueue.main.async { [weak self] in self?.updateEmojiSuggestions() }
@@ -256,7 +291,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
                 changed = true
                 continue
             }
-            if revealsActiveParagraph, NSLocationInRange(charIndex, activeParagraph) { continue }
+            if revealsSyntax(at: charIndex) { continue }
             if storage.attribute(.mdMarker, at: charIndex, effectiveRange: nil) != nil {
                 newProps[i] = storage.attribute(.mdKeepLine, at: charIndex, effectiveRange: nil) != nil ? .controlCharacter : .null
                 changed = true
@@ -284,7 +319,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     func layoutManager(_ layoutManager: NSLayoutManager, shouldUse action: NSLayoutManager.ControlCharacterAction, forControlCharacterAt charIndex: Int) -> NSLayoutManager.ControlCharacterAction {
         if let storage = layoutManager.textStorage, charIndex < storage.length,
            storage.attribute(.mdKeepLine, at: charIndex, effectiveRange: nil) != nil,
-           !(revealsActiveParagraph && NSLocationInRange(charIndex, activeParagraph)) {
+           !revealsSyntax(at: charIndex) {
             return .whitespace
         }
         return action
@@ -413,21 +448,25 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     private var foldIndexCache: Int?? = nil
 
+    /// Counts the visible text (hidden markers excluded) the way X does — URLs 23, emoji 2 — and maps the
+    /// last character above the fold back to its index in the storage.
     private func computeFoldCharacterIndex() -> Int? {
         guard let fold = foldAfterVisibleCharacters, fold > 0, let textStorage, textStorage.length > 0 else { return nil }
-        var visible = 0
-        var lastShown: Int?
+        let source = textStorage.string as NSString
+        var visible = ""
+        var origin: [Int] = []
         var i = 0
         while i < textStorage.length {
             var effective = NSRange()
             let isMarker = textStorage.attribute(.mdMarker, at: i, effectiveRange: &effective) != nil
             if !isMarker {
-                if lastShown == nil, visible + effective.length >= fold { lastShown = i + (fold - visible) - 1 }
-                visible += effective.length
+                visible += source.substring(with: effective)
+                origin.append(contentsOf: effective.location..<NSMaxRange(effective))
             }
-            i = effective.location + effective.length
+            i = NSMaxRange(effective)
         }
-        return visible > fold ? lastShown : nil
+        guard let offset = MarkdownRender.xFoldOffset(in: visible, limit: fold), offset < origin.count else { return nil }
+        return origin[offset]
     }
 
     /// Fold moved, appeared or vanished: only repaint. The marker is drawn over the text, so layout never changes.
@@ -499,6 +538,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         guard let textStorage else { return }
         styler.restyle(textStorage)
         matchEmptyCaretToPlaceholder()
+        nudgeCaretOutOfHiddenImageLines()
         foldIndexCache = nil
         needsImageLayout = true
         layoutImages()

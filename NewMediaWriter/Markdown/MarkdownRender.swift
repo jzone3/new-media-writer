@@ -92,7 +92,7 @@ enum MarkdownRender {
         let links = detector?.matches(in: text, range: NSRange(location: 0, length: ns.length)) ?? []
         for match in links {
             guard let range = Range(match.range, in: text), range.lowerBound >= cursor else { continue }
-            total += weightedLength(text[cursor..<range.lowerBound]) + 23
+            total += weightedLength(text[cursor..<range.lowerBound]) + xURLWeight
             cursor = range.upperBound
         }
         total += weightedLength(text[cursor...])
@@ -100,21 +100,51 @@ enum MarkdownRender {
     }
 
     private static func weightedLength(_ text: Substring) -> Int {
+        text.reduce(0) { $0 + xWeight(of: $1) }
+    }
+
+    /// X's weight of one character outside a URL: emoji 2, CJK and most non-Latin scalars 2, everything else 1.
+    static func xWeight(of character: Character) -> Int {
+        let scalars = character.unicodeScalars
+        if scalars.count > 1 && scalars.contains(where: { $0.properties.isEmoji }) || scalars.first?.properties.isEmojiPresentation == true {
+            return 2
+        }
         var total = 0
-        for character in text {
-            let scalars = character.unicodeScalars
-            if scalars.count > 1 && scalars.contains(where: { $0.properties.isEmoji }) || scalars.first?.properties.isEmojiPresentation == true {
-                total += 2
-                continue
-            }
-            for scalar in scalars {
-                switch scalar.value {
-                case 0...4351, 8192...8205, 8208...8223, 8242...8247: total += 1
-                default: total += 2
-                }
+        for scalar in scalars {
+            switch scalar.value {
+            case 0...4351, 8192...8205, 8208...8223, 8242...8247: total += 1
+            default: total += 2
             }
         }
         return total
+    }
+
+    static let xURLWeight = 23
+
+    /// UTF-16 offset of the last character X shows above its "Show more" fold, or nil when the text
+    /// weighs `limit` or less. A URL straddling the limit is shown whole.
+    static func xFoldOffset(in text: String, limit: Int) -> Int? {
+        let ns = text as NSString
+        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        let links = detector?.matches(in: text, range: NSRange(location: 0, length: ns.length)).map(\.range) ?? []
+        var total = 0
+        var lastShown: Int?
+        var i = 0
+        var nextLink = 0
+        while i < ns.length {
+            while nextLink < links.count, links[nextLink].location < i { nextLink += 1 }
+            let range: NSRange
+            if nextLink < links.count, links[nextLink].location == i {
+                range = links[nextLink]
+                total += xURLWeight
+            } else {
+                range = ns.rangeOfComposedCharacterSequence(at: i)
+                total += ns.substring(with: range).reduce(0) { $0 + xWeight(of: $1) }
+            }
+            if lastShown == nil, total >= limit { lastShown = NSMaxRange(range) - 1 }
+            i = NSMaxRange(range)
+        }
+        return total > limit ? lastShown : nil
     }
 }
 

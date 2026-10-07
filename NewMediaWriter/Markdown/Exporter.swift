@@ -130,26 +130,43 @@ enum Exporter {
         "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body>\(body)</body></html>"
     }
 
-    /// Rich composers like Slack's map each block element to one line and ignore `<p>` margins,
-    /// so every blank line is spelled out as an empty `<div><br></div>`.
+    /// Slack's composer turns every `<br>` and every block boundary into one newline, so paragraphs are
+    /// plain runs joined by `<br>`s (no `<div>` wrappers: `<div><br></div>` came out as two blank lines).
     static func slackHTML(_ blocks: [(block: MDBlock, blankLinesBefore: Int)]) -> String {
-        let body = MarkdownRender.joinBlocks(blocks, separator: { String(repeating: emptyLine, count: $0) }) { block in
-            switch block {
-            case .heading(_, let t):
-                "<div><b>\(inlineHTML(MarkdownInline.attributed(t), paragraphs: false))</b></div>"
-            case .paragraph(let t):
-                "<div>\(inlineHTML(MarkdownInline.attributed(t), paragraphs: false).replacingOccurrences(of: "\n", with: "<br>"))</div>"
-            case .quote(let lines):
-                "<blockquote>" + lines.map { $0.isEmpty ? emptyLine : "<div>\(inlineHTML(MarkdownInline.attributed($0), paragraphs: false))</div>" }.joined() + "</blockquote>"
-            case .code(_, let code):
-                "<pre><code>\(escape(code))</code></pre>"
-            case .list(let ordered, let items):
-                "<\(ordered ? "ol" : "ul")>" + items.map { "<li>\(inlineHTML(MarkdownInline.attributed($0), paragraphs: false))</li>" }.joined() + "</\(ordered ? "ol" : "ul")>"
-            case .image, .rule:
-                nil
+        var body = ""
+        var gap = 0
+        var previousIsInline: Bool?
+        for (block, before) in blocks {
+            gap = max(gap, before)
+            guard let (piece, isInline) = slackPiece(block) else { continue }
+            if let previousIsInline {
+                // A block element already starts and ends its own line; inline runs need one more <br>.
+                let breaks = max(1, gap) + (previousIsInline && isInline ? 1 : 0)
+                body += String(repeating: "<br>", count: breaks)
             }
+            body += piece
+            previousIsInline = isInline
+            gap = 0
         }
         return document(body)
+    }
+
+    private static func slackPiece(_ block: MDBlock) -> (html: String, isInline: Bool)? {
+        switch block {
+        case .heading(_, let t):
+            return ("<b>\(inlineHTML(MarkdownInline.attributed(t), paragraphs: false))</b>", true)
+        case .paragraph(let t):
+            return (inlineHTML(MarkdownInline.attributed(t), paragraphs: false).replacingOccurrences(of: "\n", with: "<br>"), true)
+        case .quote(let lines):
+            return ("<blockquote>" + lines.map { inlineHTML(MarkdownInline.attributed($0), paragraphs: false) }.joined(separator: "<br>") + "</blockquote>", false)
+        case .code(_, let code):
+            return ("<pre><code>\(escape(code))</code></pre>", false)
+        case .list(let ordered, let items):
+            let tag = ordered ? "ol" : "ul"
+            return ("<\(tag)>" + items.map { "<li>\(inlineHTML(MarkdownInline.attributed($0), paragraphs: false))</li>" }.joined() + "</\(tag)>", false)
+        case .image, .rule:
+            return nil
+        }
     }
 
     private static let emptyLine = "<div><br></div>"
