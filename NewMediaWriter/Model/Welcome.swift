@@ -12,7 +12,10 @@ enum Welcome {
         guard !defaults.bool(forKey: shownKey) else { return next() }
         defaults.set(true, forKey: shownKey)
 
-        let sheet = NSWindow(contentViewController: NSHostingController(rootView: WelcomeView()))
+        let host = NSHostingController(rootView: WelcomeView())
+        host.sizingOptions = [.preferredContentSize]
+        let sheet = NSWindow(contentViewController: host)
+        sheet.setContentSize(host.view.fittingSize)
         sheet.styleMask = [.titled, .fullSizeContentView]
         sheet.titlebarAppearsTransparent = true
         sheet.titleVisibility = .hidden
@@ -53,12 +56,14 @@ private struct WelcomeView: View {
             Text("Thanks for downloading\nNew Media Writer")
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 12)
             Text("I built this with Devin, Cognition's AI software engineer. The whole thing is open source.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 8)
             Button {
                 NSWorkspace.shared.open(Welcome.repoURL)
