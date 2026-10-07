@@ -110,18 +110,18 @@ jobs:
           NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
           NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
           NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          NOTARY_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
         run: |
-          echo "$NOTARY_KEY_P8" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          echo "$NOTARY_KEY_P8" | base64 --decode > "$NOTARY_KEY_PATH"
           ditto -c -k --keepParent "$APP_NAME.app" "$RUNNER_TEMP/app.zip"
-          xcrun notarytool submit "$RUNNER_TEMP/app.zip" \
-            --key "$RUNNER_TEMP/AuthKey.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
-            --wait --timeout 30m
+          scripts/notarize.sh "$RUNNER_TEMP/app.zip"
           xcrun stapler staple "$APP_NAME.app"
 
       - name: Build, sign and notarize DMG
         env:
           NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
           NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          NOTARY_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
           VERSION: ${{ steps.version.outputs.marketing }}
         run: |
           DMG="New-Media-Writer-$VERSION.dmg"
@@ -129,9 +129,7 @@ jobs:
           # Finder-laid-out image: background, icon positions, volume icon (see scripts/build-dmg.sh).
           scripts/build-dmg.sh "$APP_NAME.app" "$DMG"
           codesign --sign "Developer ID Application" --timestamp "$DMG"
-          xcrun notarytool submit "$DMG" \
-            --key "$RUNNER_TEMP/AuthKey.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
-            --wait --timeout 30m
+          scripts/notarize.sh "$DMG"
           xcrun stapler staple "$DMG"
           spctl --assess --type open --context context:primary-signature -v "$DMG"
           # Unversioned copy so /releases/latest/download/New-Media-Writer.dmg is a stable link.
