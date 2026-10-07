@@ -21,10 +21,10 @@ let br = "<div><br></div>"
 let slack = Exporter.slack(source)
 expect("slack plain keeps line breaks, blank lines and mrkdwn", slack.plain,
        "Line one\nline two\n\n*Bold* and _it_\n\n\n\nAfter three blanks\n\n• a\n• b\n\n> quote\n\n```\ncode\n\nmore\n```\n\nEnd")
-expect("slack html spells out every blank line", slack.html, doc(
-    "<div>Line one<br>line two</div>\(br)<div><b>Bold</b> and <i>it</i></div>\(br)\(br)\(br)"
-    + "<div>After three blanks</div>\(br)<ul><li>a</li><li>b</li></ul>\(br)"
-    + "<blockquote><div>quote</div></blockquote>\(br)<pre><code>code\n\nmore</code></pre>\(br)<div>End</div>"))
+expect("slack html: <br> per newline, blocks on their own lines", slack.html, doc(
+    "Line one<br>line two<br><br><b>Bold</b> and <i>it</i><br><br><br><br>"
+    + "After three blanks<br><ul><li>a</li><li>b</li></ul><br>"
+    + "<blockquote>quote</blockquote><br><pre><code>code\n\nmore</code></pre><br>End"))
 expect("slack plain-only matches slack plain", Exporter.slackPlain(source).plain, slack.plain)
 
 let linkedIn = Exporter.linkedIn(source)
@@ -37,9 +37,25 @@ expect("linkedin escapes html", Exporter.linkedIn("a < b & c").html, doc("<div>a
 
 expect("linkedin html keeps repeated and leading spaces", Exporter.linkedIn("a  b").html, doc("<div>a &nbsp;b</div>"))
 expect("slack html keeps blank lines inside quotes", Exporter.slack("> first\n>\n> last").html,
-       doc("<blockquote><div>first</div>\(br)<div>last</div></blockquote>"))
+       doc("<blockquote>first<br><br>last</blockquote>"))
+expect("slack html: two blocks in a row", Exporter.slack("> q\n\n- a").html, doc("<blockquote>q</blockquote><br><ul><li>a</li></ul>"))
+
+expect("x copy keeps an autolinked bare URL as just the URL", Exporter.xPost("Try www.newmediawriter.app today").plain,
+       "Try www.newmediawriter.app today")
+expect("x copy keeps a bare https URL as just the URL", Exporter.xPost("https://newmediawriter.app/").plain, "https://newmediawriter.app/")
+expect("x copy still exposes a titled link's URL", Exporter.xPost("[the app](https://newmediawriter.app)").plain,
+       "the app (https://newmediawriter.app)")
 
 expect("leading, trailing and skipped-block blank lines", Exporter.slack("\n\nA\n\n---\n\n\nB\n\n\n").plain, "A\n\n\nB")
+
+let longPost = String(repeating: "a", count: 300)
+expect("x fold after the 280th character", MarkdownRender.xFoldOffset(in: longPost, limit: 280).map(String.init) ?? "none", "279")
+expect("x fold: exactly 280 characters need no fold", MarkdownRender.xFoldOffset(in: String(repeating: "a", count: 280), limit: 280).map(String.init) ?? "none", "none")
+expect("x fold counts emoji as 2", MarkdownRender.xFoldOffset(in: String(repeating: "😀", count: 150), limit: 280).map(String.init) ?? "none", "279")
+let withURL = String(repeating: "a", count: 270) + " https://newmediawriter.app/some/very/long/path/that/x/shortens tail"
+expect("x fold counts a URL as 23 and shows it whole", MarkdownRender.xFoldOffset(in: withURL, limit: 280).map(String.init) ?? "none",
+       String((withURL as NSString).range(of: " tail").location - 1))
+expect("x fold: a 23-weight URL fits where its letters would not", MarkdownRender.xFoldOffset(in: String(repeating: "a", count: 256) + " https://newmediawriter.app/some/very/long/path", limit: 280).map(String.init) ?? "none", "none")
 
 let x = Exporter.xThread(source)
 expect("x plain unchanged", x.plain,

@@ -12,6 +12,13 @@ extension View {
     }
 }
 
+/// SwiftUI keeps the first `DropDelegate` it is given, so the delegate reads the card's current
+/// markdown through this box instead of a value captured when the card first appeared.
+private final class DropTarget {
+    var markdown = ""
+    var onEdit: (String) -> Void = { _ in }
+}
+
 private struct ImageDropModifier: ViewModifier {
     let documentURL: URL?
     let markdown: String
@@ -19,9 +26,12 @@ private struct ImageDropModifier: ViewModifier {
     let cornerRadius: CGFloat
     let onEdit: (String) -> Void
     @State private var targeted = false
+    @State private var target = DropTarget()
 
     func body(content: Content) -> some View {
-        content
+        target.markdown = markdown
+        target.onEdit = onEdit
+        return content
             .overlay {
                 if targeted {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -31,14 +41,13 @@ private struct ImageDropModifier: ViewModifier {
                 }
             }
             .onDrop(of: [.fileURL, .image],
-                    delegate: ImageDropDelegate(documentURL: documentURL, markdown: markdown, onEdit: onEdit, targeted: $targeted))
+                    delegate: ImageDropDelegate(documentURL: documentURL, target: target, targeted: $targeted))
     }
 }
 
 private struct ImageDropDelegate: DropDelegate {
     let documentURL: URL?
-    let markdown: String
-    let onEdit: (String) -> Void
+    let target: DropTarget
     var targeted: Binding<Bool>
 
     private var pasteboard: NSPasteboard { NSPasteboard(name: .drag) }
@@ -61,9 +70,9 @@ private struct ImageDropDelegate: DropDelegate {
             return true
         }
         guard let paths = ImageStore(documentURL: documentURL).storeMedia(from: pasteboard) else { return false }
-        var text = markdown
+        var text = target.markdown
         if !text.isEmpty, !text.hasSuffix("\n") { text += "\n" }
-        onEdit(text + ImageStore.markdown(for: paths) + "\n")
+        target.onEdit(text + ImageStore.markdown(for: paths) + "\n")
         return true
     }
 }

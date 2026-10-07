@@ -51,9 +51,13 @@ enum MarkdownInline {
 
     /// True when the visible text already is the URL (autolinked bare URL).
     static func isBareURL(_ shown: String, _ link: URL) -> Bool {
-        let a = shown.trimmingCharacters(in: .whitespaces)
-        let b = link.absoluteString
-        return a == b || a + "/" == b || a == b + "/"
+        func normalized(_ s: String) -> String {
+            var t = s.trimmingCharacters(in: .whitespaces).lowercased()
+            for scheme in ["https://", "http://", "mailto:"] where t.hasPrefix(scheme) { t.removeFirst(scheme.count) }
+            while t.hasSuffix("/") { t.removeLast() }
+            return t
+        }
+        return normalized(shown) == normalized(link.absoluteString)
     }
 
     static func stripImages(_ text: String) -> String {
