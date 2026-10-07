@@ -22,14 +22,14 @@ enum Welcome {
     /// NSAlert's informative text can't hold a link, so the description is a read-only text view.
     private static func description() -> NSView {
         let text = NSMutableAttributedString(
-            string: "I built this with Devin, Cognition's AI software engineer.\nThe source is open: ",
+            string: "I built this with Devin, Cognition's AI software engineer.\nThe source is open:\n",
             attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize), .foregroundColor: NSColor.labelColor]
         )
         text.append(NSAttributedString(
             string: repoURL.absoluteString.replacingOccurrences(of: "https://", with: ""),
             attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize), .link: repoURL]
         ))
-        let view = NSTextView(frame: NSRect(x: 0, y: 0, width: 300, height: 48))
+        let view = NSTextView(frame: NSRect(x: 0, y: 0, width: 320, height: 64))
         view.textStorage?.setAttributedString(text)
         view.isEditable = false
         view.drawsBackground = false
