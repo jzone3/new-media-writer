@@ -268,7 +268,7 @@ That to secure these rights, Governments are instituted among Men, deriving thei
       document.querySelectorAll('[data-download]').forEach(a => a.href = dmg.browser_download_url);
       const mb = (dmg.size / 1048576).toFixed(1);
       const meta = document.querySelector('[data-release-meta]');
-      if (meta) meta.textContent = `${rel.tag_name} · ${mb} MB · macOS 14+ · Signed & notarized · Free`;
+      if (meta) meta.textContent = `${rel.tag_name} · ${mb} MB · macOS 14+`;
     })
     .catch(() => {});
 })();
