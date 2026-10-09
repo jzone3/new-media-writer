@@ -1,7 +1,17 @@
+# Xcode / build output
 build/
+build-*/
 DerivedData/
-.DS_Store
 xcuserdata/
 *.xcuserstate
-build-check/
-build-avatar/
+
+# Release artifacts
+*.dmg
+*.xcarchive
+*.p8
+*.p12
+
+# Local env / OS junk
+.env
+.env.*
+.DS_Store
