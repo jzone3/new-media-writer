@@ -63,8 +63,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         editor.paste(sender)
     }
 
+    /// ⌘F with no focused editor: focus the key window's editor and open its find bar there.
+    @objc func performFindPanelAction(_ sender: Any?) {
+        guard let editor = keyWindowEditor, let window = editor.window else { return }
+        window.makeFirstResponder(editor)
+        editor.performFindPanelAction(sender)
+    }
+
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        item.action == #selector(paste(_:)) ? keyWindowEditor != nil : true
+        switch item.action {
+        case #selector(paste(_:)), #selector(performFindPanelAction(_:)): return keyWindowEditor != nil
+        default: return true
+        }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

@@ -646,9 +646,9 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     // NSTextView.pasteAsPlainText silently did nothing here, so paste the string ourselves.
     override func paste(_ sender: Any?) {
         if insertImages(from: .general) { return }
-        if let s = EditorTextView.plainText(on: .general) {
-            insertText(s, replacementRange: selectedRange())
-        }
+        guard let s = EditorTextView.plainText(on: .general) else { return }
+        if linkSelection(to: s) { return }
+        insertText(s, replacementRange: selectedRange())
     }
 
     /// Plain text for a paste; falls back to the text of rich (RTF/HTML) content when no plain-text type is present.
