@@ -25,6 +25,33 @@ extension EditorTextView {
         setSelectedRange(NSRange(location: caret, length: 0))
     }
 
+    /// Pasting a lone URL over selected text wraps it as `[selection](url)` instead of replacing it.
+    func linkSelection(to pasted: String) -> Bool {
+        let sel = selectedRange()
+        guard sel.length > 0 else { return false }
+        let url = pasted.trimmingCharacters(in: .whitespacesAndNewlines)
+        let selected = (string as NSString).substring(with: sel)
+        guard EditorTextView.isLinkURL(url),
+              selected.rangeOfCharacter(from: .newlines) == nil,
+              !EditorTextView.isLinkURL(selected.trimmingCharacters(in: .whitespaces)) else { return false }
+        let text = "[\(selected)](\(url))"
+        breakUndoCoalescing()
+        insertText(text, replacementRange: sel)
+        breakUndoCoalescing()
+        setSelectedRange(NSRange(location: sel.location + (text as NSString).length, length: 0))
+        return true
+    }
+
+    static func isLinkURL(_ s: String) -> Bool {
+        guard !s.isEmpty, s.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
+              let url = URL(string: s), let scheme = url.scheme?.lowercased() else { return false }
+        switch scheme {
+        case "http", "https": return url.host?.isEmpty == false
+        case "mailto": return true
+        default: return false
+        }
+    }
+
     @objc func toggleBulletedList(_ sender: Any?) { toggleList(ordered: false) }
     @objc func toggleNumberedList(_ sender: Any?) { toggleList(ordered: true) }
 

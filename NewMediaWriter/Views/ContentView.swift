@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var mode: ViewMode = .lastUsed
     @Environment(\.colorScheme) private var colorScheme
     @State private var pickerShown = false
+    @StateObject private var cardFinder = CardFinder()
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -41,9 +42,23 @@ struct ContentView: View {
 
     @ViewBuilder
     private var content: some View {
+        if mode.isEditor {
+            MarkdownEditor(document: document, fileURL: fileURL, raw: mode == .plaintext)
+        } else {
+            VStack(spacing: 0) {
+                CardFindBar(finder: cardFinder)
+                    .frame(height: cardFinder.barHeight)
+                feed
+            }
+            .environment(\.cardFinder, cardFinder)
+        }
+    }
+
+    @ViewBuilder
+    private var feed: some View {
         switch mode {
         case .markdown, .plaintext:
-            MarkdownEditor(document: document, fileURL: fileURL, raw: mode == .plaintext)
+            EmptyView()
         case .xPost:
             ProfileReader { profile in XPostFeedView(document: document, baseURL: fileURL, profile: profile) }
         case .linkedin:

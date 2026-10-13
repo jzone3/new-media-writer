@@ -100,6 +100,14 @@ struct ViewCommands: Commands {
             .keyboardShortcut("c", modifiers: [.command, .shift])
             .disabled(viewMode == nil)
         }
+        CommandGroup(after: .textEditing) {
+            Menu("Find") {
+                Button("Find…") { find(.showFindInterface) }.keyboardShortcut("f", modifiers: .command)
+                Button("Find and Replace…") { find(.showReplaceInterface) }.keyboardShortcut("f", modifiers: [.command, .option])
+                Button("Find Next") { find(.nextMatch) }.keyboardShortcut("g", modifiers: .command)
+                Button("Find Previous") { find(.previousMatch) }.keyboardShortcut("g", modifiers: [.command, .shift])
+            }
+        }
         // There is no help book; the stock item only showed "Help isn't available".
         CommandGroup(replacing: .help) {
             Button("New Media Writer Help") { NSWorkspace.shared.open(URL(string: "https://newmediawriter.app/")!) }
@@ -108,5 +116,12 @@ struct ViewCommands: Commands {
 
     private func send(_ action: Selector) {
         NSApp.sendAction(action, to: nil, from: nil)
+    }
+
+    /// NSTextView reads the find action from the sender's tag, as it would from a stock Find menu item.
+    private func find(_ action: NSTextFinder.Action) {
+        let item = NSMenuItem()
+        item.tag = action.rawValue
+        NSApp.sendAction(#selector(NSTextView.performFindPanelAction(_:)), to: nil, from: item)
     }
 }

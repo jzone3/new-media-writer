@@ -63,6 +63,16 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     override func doCommand(by selector: Selector) {
         if handleEmojiCommand(selector) { return }
+        if selector == #selector(cancelOperation(_:)), let cardFinder, cardFinder.isBarVisible {
+            cardFinder.hideBar()
+            return
+        }
+        if selector == #selector(cancelOperation(_:)), enclosingScrollView?.isFindBarVisible == true {
+            let item = NSMenuItem()
+            item.tag = NSTextFinder.Action.hideFindInterface.rawValue
+            performFindPanelAction(item)
+            return
+        }
         super.doCommand(by: selector)
     }
 
@@ -119,7 +129,25 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         let ok = super.becomeFirstResponder()
         if ok, revealsMarkersOnlyWhenFocused { invalidateGlyphs(in: activeParagraph) }
         if ok { nudgeCaretOutOfHiddenImageLines() }
+        if ok, let cardFinder, cardFinder.isBarVisible { cardFinder.attach(self) }
         return ok
+    }
+
+    /// Feed cards: set by `PostEditor`; Find actions go to the shared find bar above the feed.
+    weak var cardFinder: CardFinder?
+
+    override func performFindPanelAction(_ sender: Any?) {
+        if let cardFinder { cardFinder.perform(sender, for: self) } else { super.performFindPanelAction(sender) }
+    }
+
+    override func shouldChangeText(in affectedCharRange: NSRange, replacementString: String?) -> Bool {
+        cardFinder?.clientStringWillChange(self)
+        return super.shouldChangeText(in: affectedCharRange, replacementString: replacementString)
+    }
+
+    override func shouldChangeText(inRanges affectedRanges: [NSValue], replacementStrings: [String]?) -> Bool {
+        cardFinder?.clientStringWillChange(self)
+        return super.shouldChangeText(inRanges: affectedRanges, replacementStrings: replacementStrings)
     }
 
     /// `PostEditor` sets the text and caret before the first restyle, when no `.mdImage` attribute exists yet,
@@ -646,9 +674,9 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     // NSTextView.pasteAsPlainText silently did nothing here, so paste the string ourselves.
     override func paste(_ sender: Any?) {
         if insertImages(from: .general) { return }
-        if let s = EditorTextView.plainText(on: .general) {
-            insertText(s, replacementRange: selectedRange())
-        }
+        guard let s = EditorTextView.plainText(on: .general) else { return }
+        if linkSelection(to: s) { return }
+        insertText(s, replacementRange: selectedRange())
     }
 
     /// Plain text for a paste; falls back to the text of rich (RTF/HTML) content when no plain-text type is present.
