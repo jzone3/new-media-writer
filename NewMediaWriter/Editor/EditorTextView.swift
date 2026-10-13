@@ -63,6 +63,10 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     override func doCommand(by selector: Selector) {
         if handleEmojiCommand(selector) { return }
+        if selector == #selector(cancelOperation(_:)), let cardFinder, cardFinder.isBarVisible {
+            cardFinder.hideBar()
+            return
+        }
         if selector == #selector(cancelOperation(_:)), enclosingScrollView?.isFindBarVisible == true {
             let item = NSMenuItem()
             item.tag = NSTextFinder.Action.hideFindInterface.rawValue
@@ -125,7 +129,20 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         let ok = super.becomeFirstResponder()
         if ok, revealsMarkersOnlyWhenFocused { invalidateGlyphs(in: activeParagraph) }
         if ok { nudgeCaretOutOfHiddenImageLines() }
+        if ok, let cardFinder, cardFinder.isBarVisible { cardFinder.attach(self) }
         return ok
+    }
+
+    /// Feed cards: set by `PostEditor`; Find actions go to the shared find bar above the feed.
+    weak var cardFinder: CardFinder?
+
+    override func performFindPanelAction(_ sender: Any?) {
+        if let cardFinder { cardFinder.perform(sender, for: self) } else { super.performFindPanelAction(sender) }
+    }
+
+    override func shouldChangeText(in affectedCharRange: NSRange, replacementString: String?) -> Bool {
+        cardFinder?.clientStringWillChange(self)
+        return super.shouldChangeText(in: affectedCharRange, replacementString: replacementString)
     }
 
     /// `PostEditor` sets the text and caret before the first restyle, when no `.mdImage` attribute exists yet,

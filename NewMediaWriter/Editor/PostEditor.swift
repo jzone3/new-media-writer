@@ -12,6 +12,7 @@ struct PostEditor: NSViewRepresentable {
     var takesFocusOnAppear = false
     var onChange: (String) -> Void
     @Environment(\.undoManager) private var undoManager
+    @Environment(\.cardFinder) private var cardFinder
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -29,7 +30,6 @@ struct PostEditor: NSViewRepresentable {
         textView.revealsMarkersOnlyWhenFocused = true
         textView.topInset = 0
         textView.usesFindBar = false
-        textView.usesFindPanel = true
         textView.isVerticallyResizable = false
         textView.autoresizingMask = []
         textView.delegate = context.coordinator
@@ -39,6 +39,7 @@ struct PostEditor: NSViewRepresentable {
         textView.foldAfterVisibleCharacters = foldAfter
         textView.foldStyle = foldStyle
         textView.takesFocusOnAppear = takesFocusOnAppear
+        textView.cardFinder = cardFinder
         textView.string = text
         textView.restyleAndRelayout()
         context.coordinator.textView = textView
@@ -49,6 +50,7 @@ struct PostEditor: NSViewRepresentable {
         // Text views register undo operations with themselves as the unretained target; switching
         // views destroys the text view, so a later ⌘Z would message a freed object.
         (textView.undoManager ?? coordinator.parent.undoManager)?.removeAllActions(withTarget: textView)
+        textView.cardFinder?.detach(textView)
     }
 
     func updateNSView(_ textView: EditorTextView, context: Context) {
@@ -67,6 +69,7 @@ struct PostEditor: NSViewRepresentable {
         let isTyping = textView.window?.firstResponder === textView
         if isTyping, context.coordinator.isEcho(text) { return }
         context.coordinator.sentTexts.removeAll()
+        textView.cardFinder?.clientStringWillChange(textView)
         let sel = textView.selectedRange()
         textView.string = text
         textView.setSelectedRange(NSRange(location: min(sel.location, (text as NSString).length), length: 0))
