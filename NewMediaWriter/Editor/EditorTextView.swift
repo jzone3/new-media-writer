@@ -61,6 +61,16 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         }
     }
 
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .function, .numericPad])
+        if handlesTextSizeKeys, window?.firstResponder === self, mods == .command,
+           event.charactersIgnoringModifiers == "=" {
+            EditorTextSize.bigger()
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
     override func doCommand(by selector: Selector) {
         if handleEmojiCommand(selector) { return }
         if selector == #selector(cancelOperation(_:)), let cardFinder, cardFinder.isBarVisible {
@@ -82,7 +92,11 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
     }
     var onImageInserted: (() -> Void)?
 
-    var maxColumnWidth: CGFloat = 720
+    var maxColumnWidth: CGFloat = 720 {
+        didSet { if maxColumnWidth != oldValue, frame.width > 0 { updateColumn(width: frame.width) } }
+    }
+    /// Document editor only: ⌘= also makes text bigger (the menu item is ⌘+, which needs Shift on most layouts).
+    var handlesTextSizeKeys = false
     var topInset: CGFloat = 56
     /// Embedded in a feed card: no centred column, text spans the full frame width.
     var fillsWidth = false

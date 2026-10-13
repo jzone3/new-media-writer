@@ -29,6 +29,24 @@ struct EditorTheme {
     /// Draw `---` as a centred three-dot continuation instead of a full-width line. LinkedIn and Slack have no
     /// rules; there `---` only separates X thread posts, so a divider line would look like an X thread.
     var rulesAsContinuationDots = false
+    /// Text size multiplier for the document editor (⌘+ / ⌘−); 1 is the default size.
+    var scale: CGFloat = 1
+
+    /// The same theme with fonts, spacing and indents multiplied by `factor`.
+    func scaled(_ factor: CGFloat) -> EditorTheme {
+        var t = self
+        t.scale = scale * factor
+        t.body = body.withSize(body.pointSize * factor)
+        t.mono = mono.withSize(mono.pointSize * factor)
+        t.paragraphSpacing = paragraphSpacing * factor
+        if let headingFontOverride {
+            t.headingFontOverride = { level in
+                let f = headingFontOverride(level)
+                return f.withSize(f.pointSize * factor)
+            }
+        }
+        return t
+    }
 
     static let wysiwyg = EditorTheme(
         body: .systemFont(ofSize: 17, weight: .regular),
@@ -69,10 +87,10 @@ struct EditorTheme {
     func headingFont(level: Int) -> NSFont {
         if let headingFontOverride { return headingFontOverride(level) }
         switch level {
-        case 1: return .systemFont(ofSize: 32, weight: .bold)
-        case 2: return .systemFont(ofSize: 25, weight: .bold)
-        case 3: return .systemFont(ofSize: 20, weight: .semibold)
-        default: return .systemFont(ofSize: 17, weight: .semibold)
+        case 1: return .systemFont(ofSize: 32 * scale, weight: .bold)
+        case 2: return .systemFont(ofSize: 25 * scale, weight: .bold)
+        case 3: return .systemFont(ofSize: 20 * scale, weight: .semibold)
+        default: return .systemFont(ofSize: 17 * scale, weight: .semibold)
         }
     }
 }
@@ -180,6 +198,7 @@ final class MarkdownStyler {
     // MARK: - WYSIWYG
 
     private func styleLine(_ storage: NSTextStorage, _ range: NSRange, line: String, trimmed: String, string: NSString) {
+        let s = theme.scale
         let leading = line.count - line.drop(while: { $0 == " " || $0 == "\t" }).count
 
         if let (level, _) = MarkdownParser.heading(trimmed) {
@@ -189,27 +208,27 @@ final class MarkdownStyler {
             marker(storage, NSRange(location: range.location + leading, length: min(markerLen, range.length - leading)))
             paragraph(storage, range) { p in
                 p.lineHeightMultiple = self.flat ? self.theme.lineHeightMultiple : 1.2
-                p.paragraphSpacingBefore = self.flat ? 0 : (level == 1 ? 14 : 10)
-                p.paragraphSpacing = self.flat ? self.theme.paragraphSpacing : 6
+                p.paragraphSpacingBefore = self.flat ? 0 : (level == 1 ? 14 : 10) * s
+                p.paragraphSpacing = self.flat ? self.theme.paragraphSpacing : 6 * s
             }
             inline(storage, range)
             return
         }
 
         if MarkdownParser.isRule(trimmed) {
-            apply(storage, range, font: theme.mono.withSize(13), color: theme.secondary)
+            apply(storage, range, font: theme.mono.withSize(13 * s), color: theme.secondary)
             hiddenLine(storage, range)
             storage.addAttribute(.mdRule, value: true, range: range)
             paragraph(storage, range) { p in
                 p.alignment = .center
-                p.paragraphSpacing = self.flat ? 0 : 14
-                p.paragraphSpacingBefore = self.flat ? 0 : 6
+                p.paragraphSpacing = self.flat ? 0 : 14 * s
+                p.paragraphSpacingBefore = self.flat ? 0 : 6 * s
             }
             return
         }
 
         if let img = MarkdownParser.standaloneImage(trimmed) {
-            apply(storage, range, font: theme.mono.withSize(12), color: theme.secondary)
+            apply(storage, range, font: theme.mono.withSize(12 * s), color: theme.secondary)
             let h = imageHeight(img.path)
             // A local file that failed to load keeps its source line visible instead of vanishing silently.
             let isRemote = img.path.hasPrefix("http://") || img.path.hasPrefix("https://")
@@ -236,9 +255,9 @@ final class MarkdownStyler {
                 storage.addAttribute(.mdQuote, value: true, range: NSRange(location: markerEnd, length: quoteLength))
             }
             paragraph(storage, range) { p in
-                p.headIndent = 22
-                p.firstLineHeadIndent = 22
-                p.paragraphSpacing = self.flat ? 0 : 4
+                p.headIndent = 22 * s
+                p.firstLineHeadIndent = 22 * s
+                p.paragraphSpacing = self.flat ? 0 : 4 * s
             }
             inline(storage, range)
             return
@@ -253,11 +272,11 @@ final class MarkdownStyler {
             if !item.ordered, !raw, markerRange.length > 0 {
                 storage.addAttribute(.mdBullet, value: true, range: NSRange(location: markerRange.location, length: 1))
             }
-            let indent = CGFloat(leading) * 10
+            let indent = CGFloat(leading) * 10 * s
             paragraph(storage, range) { p in
                 p.firstLineHeadIndent = indent
-                p.headIndent = indent + (item.ordered ? 24 : 18)
-                p.paragraphSpacing = self.flat ? 0 : 3
+                p.headIndent = indent + (item.ordered ? 24 : 18) * s
+                p.paragraphSpacing = self.flat ? 0 : 3 * s
             }
             inline(storage, range)
             return
@@ -331,7 +350,7 @@ final class MarkdownStyler {
         Self.inlineImage.enumerateMatches(in: text, range: range) { m, _, _ in
             guard let m else { return }
             storage.addAttribute(.foregroundColor, value: self.theme.secondary, range: m.range)
-            storage.addAttribute(.font, value: self.theme.mono.withSize(13), range: m.range)
+            storage.addAttribute(.font, value: self.theme.mono.withSize(13 * self.theme.scale), range: m.range)
         }
     }
 
