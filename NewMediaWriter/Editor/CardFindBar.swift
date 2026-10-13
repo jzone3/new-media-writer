@@ -4,24 +4,42 @@ import SwiftUI
 /// The native find bar for the feed views. Feed cards aren't in an NSScrollView, so NSTextView's own
 /// find bar has nowhere to go; one NSTextFinder per window searches the focused card instead and
 /// shows its bar in `CardFindBar`, pinned above the feed.
-final class CardFinder: NSObject, ObservableObject {
+final class CardFinder: NSObject, ObservableObject, NSTextFinderBarContainer {
     let finder = NSTextFinder()
     @Published fileprivate(set) var barHeight: CGFloat = 0
     private(set) weak var client: EditorTextView?
     // One client for the window's lifetime: setting finder.client to nil drops the All button.
     private let clientProxy = CardFinderClient()
-    fileprivate weak var container: CardFindBarView? {
-        didSet { finder.findBarContainer = container }
+    /// Where the bar is drawn. The finder's container is this object rather than the view: NSTextFinder
+    /// doesn't retain its container, and SwiftUI rebuilds the view on every switch to and from Markdown.
+    fileprivate weak var host: CardFindBarView? {
+        didSet { host?.update() }
     }
+
+    var findBarView: NSView? {
+        didSet {
+            if oldValue !== findBarView { oldValue?.removeFromSuperview() }
+            host?.update()
+        }
+    }
+
+    var isFindBarVisible = false {
+        didSet { host?.update() }
+    }
+
+    func findBarViewDidChangeHeight() { host?.update() }
+
+    func contentView() -> NSView? { client }
 
     override init() {
         super.init()
         finder.client = clientProxy
+        finder.findBarContainer = self
         finder.isIncrementalSearchingEnabled = true
         finder.incrementalSearchingShouldDimContentView = true
     }
 
-    var isBarVisible: Bool { container?.isFindBarVisible == true }
+    var isBarVisible: Bool { isFindBarVisible }
 
     func attach(_ textView: EditorTextView) {
         guard client !== textView else { return }
@@ -65,34 +83,19 @@ struct CardFindBar: NSViewRepresentable {
     func makeNSView(context: Context) -> CardFindBarView {
         let view = CardFindBarView()
         view.owner = finder
-        finder.container = view
+        finder.host = view
         return view
     }
 
     func updateNSView(_ view: CardFindBarView, context: Context) {}
 
     static func dismantleNSView(_ view: CardFindBarView, coordinator: ()) {
-        if view.owner?.container === view { view.owner?.container = nil }
+        if view.owner?.host === view { view.owner?.host = nil }
     }
 }
 
-final class CardFindBarView: NSView, NSTextFinderBarContainer {
+final class CardFindBarView: NSView {
     fileprivate weak var owner: CardFinder?
-
-    var findBarView: NSView? {
-        didSet {
-            if oldValue !== findBarView { oldValue?.removeFromSuperview() }
-            update()
-        }
-    }
-
-    var isFindBarVisible = false {
-        didSet { update() }
-    }
-
-    func findBarViewDidChangeHeight() { update() }
-
-    func contentView() -> NSView? { owner?.client }
 
     override var isFlipped: Bool { true }
 
@@ -109,21 +112,23 @@ final class CardFindBarView: NSView, NSTextFinderBarContainer {
 
     override func layout() {
         super.layout()
-        if let bar = findBarView, bar.superview === self {
+        if let bar = owner?.findBarView, bar.superview === self {
             bar.frame = NSRect(x: 0, y: titlebarHeight, width: bounds.width, height: bar.frame.height)
         }
     }
 
-    private func update() {
-        if let bar = findBarView, isFindBarVisible {
+    fileprivate func update() {
+        guard let owner else { return }
+        let visible = owner.isFindBarVisible
+        if let bar = owner.findBarView, visible {
             if bar.superview !== self { addSubview(bar) }
             bar.frame = NSRect(x: 0, y: titlebarHeight, width: bounds.width, height: bar.frame.height)
-        } else {
-            findBarView?.removeFromSuperview()
+        } else if owner.findBarView?.superview === self {
+            owner.findBarView?.removeFromSuperview()
         }
-        let height = isFindBarVisible ? titlebarHeight + (findBarView?.frame.height ?? 0) : 0
-        if owner?.barHeight != height {
-            DispatchQueue.main.async { [weak self] in self?.owner?.barHeight = height }
+        let height = visible ? titlebarHeight + (owner.findBarView?.frame.height ?? 0) : 0
+        if owner.barHeight != height {
+            DispatchQueue.main.async { [weak owner] in owner?.barHeight = height }
         }
     }
 }
