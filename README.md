@@ -69,6 +69,7 @@ from Xcode.
 | Paste a URL over selected text to link it (`[text](url)`) | ⌘V |
 | Find / Find and Replace | ⌘F / ⌥⌘F |
 | Find next / previous | ⌘G / ⇧⌘G |
+| Bigger / smaller / actual-size text (Plaintext and Markdown views) | ⌘+ / ⌘− / ⌘0 |
 | Bulleted / numbered list (Enter continues a list, Enter on an empty item ends it) | ⌥⌘U / ⌥⌘O |
 
 Set your name, handle, headline, avatar and Slack channel in **Settings (⌘,)** so previews look like you.

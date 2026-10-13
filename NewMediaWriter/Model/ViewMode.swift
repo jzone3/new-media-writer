@@ -51,6 +51,9 @@ extension FocusedValues {
 struct ViewCommands: Commands {
     @FocusedValue(\.viewMode) private var viewMode
     @FocusedValue(\.viewPickerShown) private var viewPickerShown
+    @AppStorage(EditorTextSize.key) private var textScale: Double = 1
+
+    private var inEditor: Bool { viewMode?.wrappedValue.isEditor ?? false }
 
     /// Keyboard view switches also dismiss an open ⌘K picker, which would otherwise stay up over the new view.
     private func select(_ mode: ViewMode) {
@@ -82,6 +85,16 @@ struct ViewCommands: Commands {
             Button("Next View") { step(1) }
                 .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
                 .disabled(viewMode == nil)
+            Divider()
+            Button("Bigger Text") { EditorTextSize.bigger() }
+                .keyboardShortcut("+", modifiers: .command)
+                .disabled(!inEditor || !EditorTextSize.canGrow)
+            Button("Smaller Text") { EditorTextSize.smaller() }
+                .keyboardShortcut("-", modifiers: .command)
+                .disabled(!inEditor || !EditorTextSize.canShrink)
+            Button("Actual Size") { EditorTextSize.reset() }
+                .keyboardShortcut("0", modifiers: .command)
+                .disabled(!inEditor || textScale == 1)
         }
         CommandGroup(replacing: .textFormatting) {
             Button("Bold") { send(Selector(("toggleBoldface:"))) }.keyboardShortcut("b", modifiers: .command)
