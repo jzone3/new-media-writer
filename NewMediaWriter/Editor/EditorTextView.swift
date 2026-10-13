@@ -63,6 +63,12 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     override func doCommand(by selector: Selector) {
         if handleEmojiCommand(selector) { return }
+        if selector == #selector(cancelOperation(_:)), enclosingScrollView?.isFindBarVisible == true {
+            let item = NSMenuItem()
+            item.tag = NSTextFinder.Action.hideFindInterface.rawValue
+            performFindPanelAction(item)
+            return
+        }
         super.doCommand(by: selector)
     }
 

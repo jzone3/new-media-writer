@@ -29,6 +29,7 @@ struct PostEditor: NSViewRepresentable {
         textView.revealsMarkersOnlyWhenFocused = true
         textView.topInset = 0
         textView.usesFindBar = false
+        textView.usesFindPanel = true
         textView.isVerticallyResizable = false
         textView.autoresizingMask = []
         textView.delegate = context.coordinator
