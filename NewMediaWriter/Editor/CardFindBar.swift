@@ -8,13 +8,15 @@ final class CardFinder: NSObject, ObservableObject {
     let finder = NSTextFinder()
     @Published fileprivate(set) var barHeight: CGFloat = 0
     private(set) weak var client: EditorTextView?
-    private var clientProxy: CardFinderClient?
+    // One client for the window's lifetime: setting finder.client to nil drops the All button.
+    private let clientProxy = CardFinderClient()
     fileprivate weak var container: CardFindBarView? {
         didSet { finder.findBarContainer = container }
     }
 
     override init() {
         super.init()
+        finder.client = clientProxy
         finder.isIncrementalSearchingEnabled = true
         finder.incrementalSearchingShouldDimContentView = true
     }
@@ -25,8 +27,7 @@ final class CardFinder: NSObject, ObservableObject {
         guard client !== textView else { return }
         finder.cancelFindIndicator()
         client = textView
-        clientProxy = CardFinderClient(textView)
-        finder.client = clientProxy
+        clientProxy.textView = textView
         finder.noteClientStringWillChange()
     }
 
@@ -35,8 +36,7 @@ final class CardFinder: NSObject, ObservableObject {
         guard client === textView else { return }
         if isBarVisible { finder.performAction(.hideFindInterface) }
         finder.cancelFindIndicator()
-        finder.client = nil
-        clientProxy = nil
+        clientProxy.textView = nil
         client = nil
     }
 
@@ -132,7 +132,6 @@ final class CardFindBarView: NSView, NSTextFinderBarContainer {
 /// (NSTextFinder wouldn't validate any action), so this forwards the client methods to it.
 final class CardFinderClient: NSObject, NSTextFinderClient {
     weak var textView: NSTextView?
-    init(_ textView: NSTextView) { self.textView = textView }
     var string: String { textView?.string ?? "" }
     var isSelectable: Bool { textView?.isSelectable ?? false }
     var isEditable: Bool { textView?.isEditable ?? false }

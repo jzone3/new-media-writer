@@ -145,6 +145,11 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         return super.shouldChangeText(in: affectedCharRange, replacementString: replacementString)
     }
 
+    override func shouldChangeText(inRanges affectedRanges: [NSValue], replacementStrings: [String]?) -> Bool {
+        cardFinder?.clientStringWillChange(self)
+        return super.shouldChangeText(inRanges: affectedRanges, replacementStrings: replacementStrings)
+    }
+
     /// `PostEditor` sets the text and caret before the first restyle, when no `.mdImage` attribute exists yet,
     /// so the selection hook above can't see the image line: re-check once the styling is in place.
     private func nudgeCaretOutOfHiddenImageLines() {
