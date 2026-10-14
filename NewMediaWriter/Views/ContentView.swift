@@ -20,6 +20,7 @@ struct ContentView: View {
             ViewSwitcher(mode: $mode)
                 .padding(.top, 8)
                 .padding(.trailing, 12)
+                .animation(.easeOut(duration: 0.15), value: mode)
 
             if shownMode.isEditor, mode == shownMode {
                 CopyButton(payload: { Exporter.markdown(document.text) })
@@ -39,7 +40,8 @@ struct ContentView: View {
         .focusedSceneValue(\.viewPickerShown, $pickerShown)
         .focusedSceneValue(\.pdfExport, PDFExportContext(document: document, fileURL: fileURL))
         .animation(.easeOut(duration: 0.12), value: pickerShown)
-        .animation(.easeOut(duration: 0.15), value: mode)
+        // Only the pill animates on `mode`: the old view must cut to the skeleton at once (a crossfade
+        // would freeze a third of the way in), then the skeleton fades into the real view on `shownMode`.
         .animation(.easeOut(duration: 0.15), value: shownMode)
         .onChange(of: mode) { _, new in
             ViewMode.lastUsed = new
