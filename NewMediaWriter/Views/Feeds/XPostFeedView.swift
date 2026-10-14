@@ -29,11 +29,13 @@ struct XPostFeedView: View {
 
     private var text: String { document.text }
     private var thread: [MarkdownParser.ThreadSegment] { MarkdownParser.thread(text, keepTrailingEmpty: true) }
-    private var segments: [String] { thread.map(\.text) }
     @State private var focusedNewPost: Int?
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
+        // Parse once per render; the body used to re-split the document for every card.
+        let thread = self.thread
+        let segments = thread.map(\.text)
+        return ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 VStack(spacing: 0) {
                     header
@@ -57,8 +59,8 @@ struct XPostFeedView: View {
             }
 
             HStack(spacing: 8) {
-                CopyButton(payload: { Exporter.xThread(text) }, alternatives: copyAlternatives)
-                CharacterBadge(count: longestPostCount, limit: XTheme.limit,
+                CopyButton(payload: { Exporter.xThread(text) }, alternatives: copyAlternatives(segments))
+                CharacterBadge(count: longestPostCount(segments), limit: XTheme.limit,
                                detail: segments.count > 1 ? "\(segments.count) posts" : nil)
             }
             .padding(16)
@@ -117,15 +119,14 @@ struct XPostFeedView: View {
         document.text = ns.replacingCharacters(in: segment.range, with: replacement)
     }
 
-    private var copyAlternatives: [(title: String, payload: () -> Exporter.Payload)] {
-        let segments = self.segments
+    private func copyAlternatives(_ segments: [String]) -> [(title: String, payload: () -> Exporter.Payload)] {
         guard segments.count > 1 else { return [] }
         return segments.enumerated().map { i, segment in
             (title: "Copy post \(i + 1)", payload: { Exporter.xPost(segment) })
         }
     }
 
-    private var longestPostCount: Int {
+    private func longestPostCount(_ segments: [String]) -> Int {
         segments.map { MarkdownRender.xCount(String(MarkdownRender.xAttributed($0).characters)) }.max() ?? 0
     }
 
