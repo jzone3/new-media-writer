@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import UniformTypeIdentifiers
 
 /// What a local file is right now (inode, size, modification date), so a deleted or replaced file
@@ -21,19 +22,24 @@ final class ImageCache {
     private var cache: [URL: NSImage] = [:]
     private var identities: [URL: FileIdentity] = [:]
     private var pending: Set<URL> = []
+    private var posters: [URL: (identity: FileIdentity?, image: NSImage?)] = [:]
+    private var posterWaiters: [URL: [() -> Void]] = [:]
     private let lock = NSLock()
 
-    /// Synchronous lookup for local files; remote images are fetched in the background and
-    /// `onLoad` is called on the main thread once available.
+    /// Synchronous lookup for local files; remote images and video poster frames are made in the
+    /// background and `onLoad` is called on the main thread once available.
     func image(for url: URL, onLoad: (() -> Void)? = nil) -> NSImage? {
+        if ImageStore.isVideo(url) { return poster(for: url, onLoad: onLoad) }
         if url.isFileURL {
             let identity = FileIdentity(url)
             lock.lock()
-            if let identity, identities[url] == identity, let cached = cache[url] { lock.unlock(); return cached }
+            // Failed loads are remembered too, so a file that isn't an image is read once, not on every keystroke.
+            if let identity, identities[url] == identity { let cached = cache[url]; lock.unlock(); return cached }
             cache[url] = nil
             identities[url] = nil
             lock.unlock()
-            guard let identity, let img = NSImage(contentsOf: url) else { return nil }
+            guard let identity else { return nil }
+            let img = NSImage(contentsOf: url)
             lock.lock(); cache[url] = img; identities[url] = identity; lock.unlock()
             return img
         }
@@ -60,7 +66,54 @@ final class ImageCache {
     }
 
     func invalidate(_ url: URL) {
-        lock.lock(); cache[url] = nil; identities[url] = nil; lock.unlock()
+        lock.lock(); cache[url] = nil; identities[url] = nil; posters[url] = nil; lock.unlock()
+    }
+
+    /// A video's first frame with a play badge, made off the main thread (never by reading the whole file).
+    private func poster(for url: URL, onLoad: (() -> Void)?) -> NSImage? {
+        let identity = url.isFileURL ? FileIdentity(url) : nil
+        if url.isFileURL, identity == nil { return nil }
+        lock.lock()
+        if let entry = posters[url], entry.identity == identity { lock.unlock(); return entry.image }
+        let alreadyPending = posterWaiters[url] != nil
+        posterWaiters[url, default: []].append(onLoad ?? {})
+        lock.unlock()
+        guard !alreadyPending else { return nil }
+
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 1600, height: 1600)
+        generator.generateCGImageAsynchronously(for: .zero) { [weak self] cgImage, _, _ in
+            guard let self else { return }
+            let image = cgImage.map(Self.posterImage)
+            self.lock.lock()
+            self.posters[url] = (identity, image)
+            let waiters = self.posterWaiters.removeValue(forKey: url) ?? []
+            self.lock.unlock()
+            DispatchQueue.main.async { waiters.forEach { $0() } }
+        }
+        return nil
+    }
+
+    private static func posterImage(_ frame: CGImage) -> NSImage {
+        let size = NSSize(width: frame.width, height: frame.height)
+        return NSImage(size: size, flipped: false) { rect in
+            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            ctx.draw(frame, in: rect)
+            let d = min(rect.width, rect.height) * 0.22
+            let circle = NSRect(x: rect.midX - d / 2, y: rect.midY - d / 2, width: d, height: d)
+            NSColor.black.withAlphaComponent(0.55).setFill()
+            NSBezierPath(ovalIn: circle).fill()
+            let t = d * 0.36
+            let play = NSBezierPath()
+            play.move(to: NSPoint(x: circle.midX - t * 0.4, y: circle.midY - t / 2))
+            play.line(to: NSPoint(x: circle.midX - t * 0.4, y: circle.midY + t / 2))
+            play.line(to: NSPoint(x: circle.midX + t * 0.55, y: circle.midY))
+            play.close()
+            NSColor.white.setFill()
+            play.fill()
+            return true
+        }
     }
 }
 
