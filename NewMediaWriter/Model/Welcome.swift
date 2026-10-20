@@ -35,7 +35,9 @@ enum Welcome {
         sheet.setContentSize(host.view.fittingSize)
 
         if let window = NSApp.keyWindow ?? NSApp.mainWindow, window.isVisible, window.attachedSheet == nil {
-            window.beginSheet(sheet) { _ in finish() }
+            // endSheet calls this before it orders the sheet out, and `next` can run a modal alert
+            // (the default-app prompt), which would leave the sheet on screen until that alert closes.
+            window.beginSheet(sheet) { _ in DispatchQueue.main.async(execute: finish) }
         } else {
             sheet.center()
             sheet.makeKeyAndOrderFront(nil)
@@ -74,7 +76,8 @@ private struct WelcomeView: View {
         .padding(.top, 36)
         .padding(.bottom, 28)
         .frame(width: 400)
-        .onExitCommand(perform: done)
+        // onExitCommand needs a focused view; a key equivalent closes the sheet on Esc from anywhere.
+        .background(Button("Close", action: done).keyboardShortcut(.cancelAction).opacity(0).accessibilityHidden(true))
     }
 
     private func pill(_ title: String, filled: Bool, action: @escaping () -> Void) -> some View {
