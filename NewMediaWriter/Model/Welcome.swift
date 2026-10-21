@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// One-time "thanks for downloading" sheet on first launch; OK opens the author's X profile.
+/// One-time "thanks for downloading" sheet on first launch; Let's Write opens the author's X profile.
 enum Welcome {
     static let shownKey = "welcomeShown"
     static let repoURL = URL(string: "https://github.com/jzone3/new-media-writer")!
@@ -12,39 +12,41 @@ enum Welcome {
         guard !defaults.bool(forKey: shownKey) else { return next() }
         defaults.set(true, forKey: shownKey)
 
-        let host = NSHostingController(rootView: WelcomeView())
-        host.sizingOptions = [.preferredContentSize]
-        let sheet = NSWindow(contentViewController: host)
-        sheet.setContentSize(host.view.fittingSize)
-        sheet.styleMask = [.titled, .fullSizeContentView]
-        sheet.titlebarAppearsTransparent = true
-        sheet.titleVisibility = .hidden
         let finish = {
             NSWorkspace.shared.open(authorURL)
             next()
         }
-        if let window = NSApp.keyWindow, window.attachedSheet == nil {
-            window.beginSheet(sheet) { _ in finish() }
+        let sheet = NSWindow(contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
+        sheet.titlebarAppearsTransparent = true
+        sheet.titleVisibility = .hidden
+        sheet.isReleasedWhenClosed = false
+        // The button holds the window itself: no runtime window lookup and no modal loop to stop.
+        let host = NSHostingController(rootView: WelcomeView { [weak sheet] in
+            guard let sheet else { return }
+            if let parent = sheet.sheetParent {
+                parent.endSheet(sheet)
+            } else {
+                sheet.orderOut(nil)
+                finish()
+            }
+        })
+        host.sizingOptions = [.preferredContentSize]
+        sheet.contentViewController = host
+        sheet.setContentSize(host.view.fittingSize)
+
+        if let window = NSApp.keyWindow ?? NSApp.mainWindow, window.isVisible, window.attachedSheet == nil {
+            // endSheet calls this before it orders the sheet out, and `next` can run a modal alert
+            // (the default-app prompt), which would leave the sheet on screen until that alert closes.
+            window.beginSheet(sheet) { _ in DispatchQueue.main.async(execute: finish) }
         } else {
             sheet.center()
-            NSApp.runModal(for: sheet)
-            sheet.orderOut(nil)
-            finish()
-        }
-    }
-
-    static func dismiss(_ window: NSWindow?) {
-        guard let window else { return }
-        if let parent = window.sheetParent {
-            parent.endSheet(window)
-        } else {
-            NSApp.stopModal()
+            sheet.makeKeyAndOrderFront(nil)
         }
     }
 }
 
 private struct WelcomeView: View {
-    @State private var window: NSWindow?
+    let done: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -66,7 +68,7 @@ private struct WelcomeView: View {
                 .padding(.bottom, 28)
             HStack(spacing: 10) {
                 pill("GitHub", filled: false) { NSWorkspace.shared.open(Welcome.repoURL) }
-                pill("Let's Write", filled: true) { Welcome.dismiss(window) }
+                pill("Let's Write", filled: true, action: done)
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -74,7 +76,8 @@ private struct WelcomeView: View {
         .padding(.top, 36)
         .padding(.bottom, 28)
         .frame(width: 400)
-        .background(WindowReader { window = $0 })
+        // onExitCommand needs a focused view; a key equivalent closes the sheet on Esc from anywhere.
+        .background(Button("Close", action: done).keyboardShortcut(.cancelAction).opacity(0).accessibilityHidden(true))
     }
 
     private func pill(_ title: String, filled: Bool, action: @escaping () -> Void) -> some View {
@@ -91,14 +94,4 @@ private struct WelcomeView: View {
         .buttonStyle(.plain)
         .pointingHandCursor()
     }
-}
-
-private struct WindowReader: NSViewRepresentable {
-    let found: (NSWindow) -> Void
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async { if let window = view.window { found(window) } }
-        return view
-    }
-    func updateNSView(_ nsView: NSView, context: Context) {}
 }
