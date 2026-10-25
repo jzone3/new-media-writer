@@ -253,6 +253,7 @@ private struct MediaControls: ViewModifier {
             }
             .onDisappear { if hovering { hovering = false; NSCursor.pop() } }
             .help(isVideo ? "" : "Click to open \(url?.lastPathComponent ?? "image")")
+            .environment(\.mediaRemoveAction, onRemove)
             .contextMenu {
                 if let url {
                     Button(isVideo ? "Copy Video" : "Copy Image") { MediaMenu.copy(url) }
@@ -319,27 +320,49 @@ struct DocumentVideo: View {
     }
 }
 
+extension EnvironmentValues {
+    /// "Remove from Post" for the media item a view sits in, so native players can offer it in their own menu.
+    @Entry var mediaRemoveAction: (() -> Void)? = nil
+}
+
 private struct VideoPlayerView: NSViewRepresentable {
     let url: URL
+    @Environment(\.mediaRemoveAction) private var onRemove
 
-    func makeNSView(context: Context) -> AVPlayerView {
-        let view = AVPlayerView()
+    func makeNSView(context: Context) -> MediaPlayerView {
+        let view = MediaPlayerView()
         view.controlsStyle = .inline
         view.videoGravity = .resizeAspectFill
         view.showsFullScreenToggleButton = true
         view.player = AVPlayer(url: url)
+        view.url = url
+        view.onRemove = onRemove
         return view
     }
 
-    func updateNSView(_ view: AVPlayerView, context: Context) {
+    func updateNSView(_ view: MediaPlayerView, context: Context) {
         if (view.player?.currentItem?.asset as? AVURLAsset)?.url != url {
             view.player = AVPlayer(url: url)
         }
+        view.url = url
+        view.onRemove = onRemove
     }
 
-    static func dismantleNSView(_ view: AVPlayerView, coordinator: ()) {
+    static func dismantleNSView(_ view: MediaPlayerView, coordinator: ()) {
         view.player?.pause()
         view.player = nil
+    }
+}
+
+/// AVPlayerView swallows right-clicks with its own "Copy Subject / Share" menu, so the SwiftUI
+/// `contextMenu` never fires over a video; this gives it the same menu as images.
+final class MediaPlayerView: AVPlayerView {
+    var url: URL?
+    var onRemove: (() -> Void)?
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        guard let url else { return super.menu(for: event) }
+        return MediaMenu.menu(for: url, onRemove: onRemove)
     }
 }
 

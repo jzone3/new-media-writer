@@ -134,7 +134,7 @@ enum ImagePathResolver {
 final class MediaMenu: NSObject {
     static let shared = MediaMenu()
 
-    static func menu(for url: URL) -> NSMenu {
+    static func menu(for url: URL, onRemove: (() -> Void)? = nil) -> NSMenu {
         let menu = NSMenu()
         let video = ImageStore.isVideo(url)
         for (title, action) in [
@@ -152,7 +152,22 @@ final class MediaMenu: NSObject {
             item.representedObject = url
             menu.addItem(item)
         }
+        if let onRemove {
+            menu.addItem(.separator())
+            let item = NSMenuItem(title: "Remove from Post", action: #selector(MenuAction.fire), keyEquivalent: "")
+            let action = MenuAction(onRemove)
+            item.target = action
+            item.representedObject = action
+            menu.addItem(item)
+        }
         return menu
+    }
+
+    /// Holds a closure for an NSMenuItem (kept alive through `representedObject`).
+    private final class MenuAction: NSObject {
+        let run: () -> Void
+        init(_ run: @escaping () -> Void) { self.run = run }
+        @objc func fire() { run() }
     }
 
     /// Puts the file and (for images) its bitmap on the clipboard in one item, so Finder pastes the file
