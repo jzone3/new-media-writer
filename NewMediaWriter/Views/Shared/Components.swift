@@ -253,8 +253,10 @@ private struct MediaControls: ViewModifier {
             }
             .onDisappear { if hovering { hovering = false; NSCursor.pop() } }
             .help(isVideo ? "" : "Click to open \(url?.lastPathComponent ?? "image")")
+            .environment(\.mediaRemoveAction, onRemove)
             .contextMenu {
-                if url != nil {
+                if let url {
+                    Button(isVideo ? "Copy Video" : "Copy Image") { MediaMenu.copy(url) }
                     Button(isVideo ? "Open Video" : "Open Image") { open() }
                 }
                 if let url, url.isFileURL {
@@ -318,27 +320,63 @@ struct DocumentVideo: View {
     }
 }
 
+extension EnvironmentValues {
+    /// "Remove from Post" for the media item a view sits in, so native players can offer it in their own menu.
+    @Entry var mediaRemoveAction: (() -> Void)? = nil
+}
+
 private struct VideoPlayerView: NSViewRepresentable {
     let url: URL
+    @Environment(\.mediaRemoveAction) private var onRemove
 
-    func makeNSView(context: Context) -> AVPlayerView {
-        let view = AVPlayerView()
+    func makeNSView(context: Context) -> MediaPlayerView {
+        let view = MediaPlayerView()
         view.controlsStyle = .inline
         view.videoGravity = .resizeAspectFill
         view.showsFullScreenToggleButton = true
         view.player = AVPlayer(url: url)
+        view.url = url
+        view.onRemove = onRemove
         return view
     }
 
-    func updateNSView(_ view: AVPlayerView, context: Context) {
+    func updateNSView(_ view: MediaPlayerView, context: Context) {
         if (view.player?.currentItem?.asset as? AVURLAsset)?.url != url {
             view.player = AVPlayer(url: url)
         }
+        view.url = url
+        view.onRemove = onRemove
     }
 
-    static func dismantleNSView(_ view: AVPlayerView, coordinator: ()) {
+    static func dismantleNSView(_ view: MediaPlayerView, coordinator: ()) {
         view.player?.pause()
         view.player = nil
+    }
+}
+
+/// AVPlayerView's internal content views take right-clicks for their own "Copy Subject / Share" menu
+/// before the SwiftUI `contextMenu` or this view's `menu(for:)` ever see them, so right-clicks over the
+/// player are caught by a local event monitor and answered with the same menu images get.
+final class MediaPlayerView: AVPlayerView {
+    var url: URL?
+    var onRemove: (() -> Void)?
+    private var monitor: Any?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let monitor { NSEvent.removeMonitor(monitor); self.monitor = nil }
+        guard window != nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown, .leftMouseDown]) { [weak self] event in
+            guard let self, let url = self.url, let window = self.window, event.window === window,
+                  event.type == .rightMouseDown || event.modifierFlags.contains(.control),
+                  let hit = window.contentView?.hitTest(event.locationInWindow), hit.isDescendant(of: self) else { return event }
+            NSMenu.popUpContextMenu(MediaMenu.menu(for: url, onRemove: self.onRemove), with: event, for: self)
+            return nil
+        }
+    }
+
+    deinit {
+        if let monitor { NSEvent.removeMonitor(monitor) }
     }
 }
 
