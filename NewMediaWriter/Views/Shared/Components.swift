@@ -254,7 +254,8 @@ private struct MediaControls: ViewModifier {
             .onDisappear { if hovering { hovering = false; NSCursor.pop() } }
             .help(isVideo ? "" : "Click to open \(url?.lastPathComponent ?? "image")")
             .contextMenu {
-                if url != nil {
+                if let url {
+                    Button(isVideo ? "Copy Video" : "Copy Image") { MediaMenu.copy(url) }
                     Button(isVideo ? "Open Video" : "Open Image") { open() }
                 }
                 if let url, url.isFileURL {

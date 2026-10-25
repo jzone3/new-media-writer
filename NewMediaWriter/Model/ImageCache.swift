@@ -130,6 +130,61 @@ enum ImagePathResolver {
     }
 }
 
+/// Right-click menu shared by inline editor images and card media: Copy, Open, Show in Finder.
+final class MediaMenu: NSObject {
+    static let shared = MediaMenu()
+
+    static func menu(for url: URL) -> NSMenu {
+        let menu = NSMenu()
+        let video = ImageStore.isVideo(url)
+        for (title, action) in [
+            (video ? "Copy Video" : "Copy Image", #selector(copyMedia(_:))),
+            (video ? "Open Video" : "Open Image", #selector(openMedia(_:))),
+        ] {
+            let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+            item.target = shared
+            item.representedObject = url
+            menu.addItem(item)
+        }
+        if url.isFileURL {
+            let item = NSMenuItem(title: "Show in Finder", action: #selector(showInFinder(_:)), keyEquivalent: "")
+            item.target = shared
+            item.representedObject = url
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    /// Puts the file and (for images) its bitmap on the clipboard in one item, so Finder pastes the file
+    /// and image-taking apps (Slack, Messages, Preview) paste the picture.
+    static func copy(_ url: URL) {
+        let item = NSPasteboardItem()
+        if url.isFileURL { item.setString(url.absoluteString, forType: .fileURL) }
+        if !ImageStore.isVideo(url), let image = ImageCache.shared.image(for: url), let tiff = image.tiffRepresentation {
+            item.setData(tiff, forType: .tiff)
+            if let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+                item.setData(png, forType: .png)
+            }
+        }
+        guard !item.types.isEmpty else { return }
+        let pboard = NSPasteboard.general
+        pboard.clearContents()
+        pboard.writeObjects([item])
+    }
+
+    @objc private func copyMedia(_ sender: NSMenuItem) {
+        if let url = sender.representedObject as? URL { Self.copy(url) }
+    }
+
+    @objc private func openMedia(_ sender: NSMenuItem) {
+        if let url = sender.representedObject as? URL { NSWorkspace.shared.open(url) }
+    }
+
+    @objc private func showInFinder(_ sender: NSMenuItem) {
+        if let url = sender.representedObject as? URL { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+    }
+}
+
 /// Copies pasted / dropped images and videos into `assets/` beside the document and returns their markdown paths.
 struct ImageStore {
     let documentURL: URL

@@ -657,6 +657,21 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         needsImageLayout = false
     }
 
+    /// Right-clicking an inline image offers Copy / Open / Show in Finder instead of the text menu.
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let point = convert(event.locationInWindow, from: nil)
+        if let url = imageURL(at: point) { return MediaMenu.menu(for: url) }
+        return super.menu(for: event)
+    }
+
+    private func imageURL(at point: NSPoint) -> URL? {
+        guard let textStorage,
+              let range = imageViews.first(where: { $0.value.frame.contains(point) })?.key,
+              range.location < textStorage.length,
+              let path = textStorage.attribute(.mdImage, at: range.location, effectiveRange: nil) as? String else { return nil }
+        return ImagePathResolver.resolve(path, relativeTo: documentURL)
+    }
+
     // MARK: - Paste & drop
 
     // Rich types are listed so Paste validates (and ⌘V fires) for an RTF/HTML-only pasteboard;
