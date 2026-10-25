@@ -354,15 +354,29 @@ private struct VideoPlayerView: NSViewRepresentable {
     }
 }
 
-/// AVPlayerView swallows right-clicks with its own "Copy Subject / Share" menu, so the SwiftUI
-/// `contextMenu` never fires over a video; this gives it the same menu as images.
+/// AVPlayerView's internal content views take right-clicks for their own "Copy Subject / Share" menu
+/// before the SwiftUI `contextMenu` or this view's `menu(for:)` ever see them, so right-clicks over the
+/// player are caught by a local event monitor and answered with the same menu images get.
 final class MediaPlayerView: AVPlayerView {
     var url: URL?
     var onRemove: (() -> Void)?
+    private var monitor: Any?
 
-    override func menu(for event: NSEvent) -> NSMenu? {
-        guard let url else { return super.menu(for: event) }
-        return MediaMenu.menu(for: url, onRemove: onRemove)
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let monitor { NSEvent.removeMonitor(monitor); self.monitor = nil }
+        guard window != nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown, .leftMouseDown]) { [weak self] event in
+            guard let self, let url = self.url, let window = self.window, event.window === window,
+                  event.type == .rightMouseDown || event.modifierFlags.contains(.control),
+                  let hit = window.contentView?.hitTest(event.locationInWindow), hit.isDescendant(of: self) else { return event }
+            NSMenu.popUpContextMenu(MediaMenu.menu(for: url, onRemove: self.onRemove), with: event, for: self)
+            return nil
+        }
+    }
+
+    deinit {
+        if let monitor { NSEvent.removeMonitor(monitor) }
     }
 }
 
