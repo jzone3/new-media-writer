@@ -22,6 +22,11 @@ final class ImageCache {
     private var cache: [URL: NSImage] = [:]
     private var identities: [URL: FileIdentity] = [:]
     private var pending: Set<URL> = []
+    /// Remote URLs whose last fetch returned no image, with when it failed. Without this every failed
+    /// fetch's `onLoad` restyle asked for the image again, and a document with many unreachable images
+    /// fanned out into an ever-growing storm of requests until the app died.
+    private var failed: [URL: Date] = [:]
+    static let retryFailedAfter: TimeInterval = 60
     private var posters: [URL: (identity: FileIdentity?, image: NSImage?)] = [:]
     private var posterWaiters: [URL: [() -> Void]] = [:]
     private let lock = NSLock()
@@ -46,9 +51,7 @@ final class ImageCache {
 
         lock.lock()
         if let cached = cache[url] { lock.unlock(); return cached }
-        lock.unlock()
-
-        lock.lock()
+        if let failedAt = failed[url], Date().timeIntervalSince(failedAt) < Self.retryFailedAfter { lock.unlock(); return nil }
         let alreadyPending = pending.contains(url)
         if !alreadyPending { pending.insert(url) }
         lock.unlock()
@@ -58,15 +61,27 @@ final class ImageCache {
             guard let self else { return }
             self.lock.lock()
             self.pending.remove(url)
-            if let data, let img = NSImage(data: data) { self.cache[url] = img }
+            if let data, let img = NSImage(data: data) {
+                self.cache[url] = img
+                self.failed[url] = nil
+            } else {
+                self.failed[url] = Date()
+            }
             self.lock.unlock()
             DispatchQueue.main.async { onLoad?() }
         }.resume()
         return nil
     }
 
+    /// True for a remote image whose fetch failed recently (it is not retried until `retryFailedAfter` passes).
+    func hasFailed(_ url: URL) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard let failedAt = failed[url] else { return false }
+        return Date().timeIntervalSince(failedAt) < Self.retryFailedAfter
+    }
+
     func invalidate(_ url: URL) {
-        lock.lock(); cache[url] = nil; identities[url] = nil; posters[url] = nil; lock.unlock()
+        lock.lock(); cache[url] = nil; identities[url] = nil; posters[url] = nil; failed[url] = nil; lock.unlock()
     }
 
     /// A video's first frame with a play badge, made off the main thread (never by reading the whole file).

@@ -101,7 +101,9 @@ final class MarkdownStyler {
     var raw = false
     /// Returns the display height for an image path given the current column width.
     var imageHeight: (String) -> CGFloat = { _ in 0 }
-    /// Document editor only: a local image that fails to load keeps its source line visible.
+    /// True while a remote image is still being fetched (its height is unknown, not zero).
+    var imageIsLoading: (String) -> Bool = { _ in false }
+    /// Document editor only: an image that fails to load keeps its source line visible.
     var revealsBrokenImages = false
 
     private static let inlineCode = try! NSRegularExpression(pattern: "`([^`\\n]+)`")
@@ -230,9 +232,9 @@ final class MarkdownStyler {
         if let img = MarkdownParser.standaloneImage(trimmed) {
             apply(storage, range, font: theme.mono.withSize(12 * s), color: theme.secondary)
             let h = imageHeight(img.path)
-            // A local file that failed to load keeps its source line visible instead of vanishing silently.
-            let isRemote = img.path.hasPrefix("http://") || img.path.hasPrefix("https://")
-            if h > 0 || isRemote || !revealsBrokenImages { hiddenLine(storage, range) }
+            // An image that failed to load keeps its source line visible instead of vanishing silently;
+            // a remote one stays hidden only while its fetch is still in flight.
+            if h > 0 || imageIsLoading(img.path) || !revealsBrokenImages { hiddenLine(storage, range) }
             storage.addAttribute(.mdImage, value: img.path, range: range)
             paragraph(storage, range) { p in
                 p.paragraphSpacing = h + 16

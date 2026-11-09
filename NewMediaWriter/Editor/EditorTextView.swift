@@ -228,6 +228,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         minSize = NSSize(width: 0, height: 0)
         maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         styler.imageHeight = { [weak self] path in self?.displayHeight(forImagePath: path) ?? 0 }
+        styler.imageIsLoading = { [weak self] path in self?.isLoadingRemoteImage(path: path) ?? false }
         styler.revealsBrokenImages = showsImages
     }
 
@@ -574,6 +575,12 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         let width = min(size.width, columnWidth)
         let height = width * size.height / size.width
         return min(height, 480)
+    }
+
+    /// A remote image with no bitmap yet is either still downloading or has failed; only the former is "loading".
+    private func isLoadingRemoteImage(path: String) -> Bool {
+        guard let url = ImagePathResolver.resolve(path, relativeTo: documentURL), !url.isFileURL else { return false }
+        return !ImageCache.shared.hasFailed(url)
     }
 
     func restyleAndRelayout() {
