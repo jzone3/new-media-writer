@@ -228,6 +228,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         minSize = NSSize(width: 0, height: 0)
         maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         styler.imageHeight = { [weak self] path in self?.displayHeight(forImagePath: path) ?? 0 }
+        styler.imageIsLoading = { [weak self] path in self?.isLoadingRemoteImage(path: path) ?? false }
         styler.revealsBrokenImages = showsImages
     }
 
@@ -566,7 +567,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
 
     func displayHeight(forImagePath path: String) -> CGFloat {
         guard showsImages, let url = ImagePathResolver.resolve(path, relativeTo: documentURL),
-              let image = ImageCache.shared.image(for: url, onLoad: { [weak self] in self?.restyleAndRelayout() }) else {
+              let image = ImageCache.shared.image(for: url, onLoad: { [weak self] in self?.restyleWhenImagesLoad() }) else {
             return 0
         }
         let size = image.size
@@ -574,6 +575,26 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate, NSTextStorageDe
         let width = min(size.width, columnWidth)
         let height = width * size.height / size.width
         return min(height, 480)
+    }
+
+    private var imageRestylePending = false
+
+    /// Many images finish (or fail) in the same run-loop turn; one restyle covers all of them. Restyling
+    /// the whole document once per image kept the main thread busy for 15 s+ on an image-heavy file.
+    private func restyleWhenImagesLoad() {
+        guard !imageRestylePending else { return }
+        imageRestylePending = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.imageRestylePending = false
+            self.restyleAndRelayout()
+        }
+    }
+
+    /// A remote image with no bitmap yet is either still downloading or has failed; only the former is "loading".
+    private func isLoadingRemoteImage(path: String) -> Bool {
+        guard let url = ImagePathResolver.resolve(path, relativeTo: documentURL), !url.isFileURL else { return false }
+        return !ImageCache.shared.hasFailed(url)
     }
 
     func restyleAndRelayout() {
