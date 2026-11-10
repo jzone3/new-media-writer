@@ -88,10 +88,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             NSDocumentController.shared.newDocument(nil)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            Welcome.showIfNeeded {
-                DefaultApp.promptIfNeeded()
-                UpdateChecker.shared.checkOnLaunch()
+            SessionRestore.promptIfNeeded {
+                Welcome.showIfNeeded {
+                    DefaultApp.promptIfNeeded()
+                    UpdateChecker.shared.checkOnLaunch()
+                }
             }
         }
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        SessionRestore.appWillQuit()
+        return .terminateNow
     }
 }

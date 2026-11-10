@@ -4,7 +4,10 @@ import SwiftUI
 struct NewMediaWriterApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
-    init() { ScrollPassthrough.install() }
+    init() {
+        ScrollPassthrough.install()
+        SessionRestore.install()
+    }
 
     var body: some Scene {
         DocumentGroup(newDocument: { MarkdownDocument() }) { config in
