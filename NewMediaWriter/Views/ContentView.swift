@@ -43,6 +43,8 @@ struct ContentView: View {
         // main thread stalls right after while the feed builds and a crossfade would freeze part-way.
         // Only the skeleton -> real view hand-off fades, on `shownMode`.
         .animation(.easeOut(duration: 0.15), value: shownMode)
+        // Save As / rename: the list of files to offer on the next launch tracks the new name.
+        .onChange(of: fileURL) { _, _ in SessionRestore.record() }
         .onChange(of: mode) { _, new in
             ViewMode.lastUsed = new
             if new.isEditor && shownMode.isEditor {
