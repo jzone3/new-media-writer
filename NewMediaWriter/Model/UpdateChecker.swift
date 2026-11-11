@@ -62,6 +62,7 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
     private var downloadTask: URLSessionDownloadTask?
     private var progressWindow: UpdateProgressWindow?
     private var pendingRelease: Release?
+    private var afterInstallAbandoned: (() -> Void)?
 
     func checkOnLaunch() {
         if let last = UserDefaults.standard.object(forKey: Self.lastCheckKey) as? Date,
@@ -69,24 +70,31 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.check(userInitiated: false) }
     }
 
-    func check(userInitiated: Bool) {
-        guard !isChecking, downloadTask == nil else { return }
+    /// Runs before last session's files are offered, so a build that crashes on them can offer its fix
+    /// first. Skips the daily throttle (a crash loop relaunches many times a day) and gives up quickly
+    /// when offline or GitHub is slow; `next` always runs unless the update is installing.
+    func checkBeforeReopening(then next: @escaping () -> Void) {
+        check(userInitiated: false, timeout: 5, completion: next)
+    }
+
+    func check(userInitiated: Bool, timeout: TimeInterval = 10, completion: (() -> Void)? = nil) {
+        guard !isChecking, downloadTask == nil else { completion?(); return }
         isChecking = true
-        var request = URLRequest(url: Self.latestReleaseURL, timeoutInterval: 10)
+        var request = URLRequest(url: Self.latestReleaseURL, timeoutInterval: timeout)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         URLSession.shared.dataTask(with: request) { data, response, _ in
             switch (response as? HTTPURLResponse)?.statusCode {
-            case 200: self.finishCheck(data.flatMap(Release.init(json:)), userInitiated: userInitiated)
-            case 403, 429: self.probeLatestRedirect(userInitiated: userInitiated)
-            default: self.finishCheck(nil, userInitiated: userInitiated)
+            case 200: self.finishCheck(data.flatMap(Release.init(json:)), userInitiated: userInitiated, completion: completion)
+            case 403, 429: self.probeLatestRedirect(userInitiated: userInitiated, timeout: timeout, completion: completion)
+            default: self.finishCheck(nil, userInitiated: userInitiated, completion: completion)
             }
         }.resume()
     }
 
     /// The unauthenticated API allows 60 requests/hour per IP, so on a shared network it often answers 403.
     /// The stable download link redirects to `/releases/download/vX.Y.Z/…` and isn't rate-limited.
-    private func probeLatestRedirect(userInitiated: Bool) {
-        var request = URLRequest(url: Self.latestDownloadURL, timeoutInterval: 10)
+    private func probeLatestRedirect(userInitiated: Bool, timeout: TimeInterval, completion: (() -> Void)?) {
+        var request = URLRequest(url: Self.latestDownloadURL, timeoutInterval: timeout)
         request.httpMethod = "HEAD"
         let session = URLSession(configuration: .ephemeral, delegate: RedirectCatcher(), delegateQueue: nil)
         session.dataTask(with: request) { _, response, _ in
@@ -99,7 +107,7 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
                 release = Release(version: version, downloadURL: location)
             }
             session.finishTasksAndInvalidate()
-            self.finishCheck(release, userInitiated: userInitiated)
+            self.finishCheck(release, userInitiated: userInitiated, completion: completion)
         }.resume()
     }
 
@@ -110,29 +118,34 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
         }
     }
 
-    private func finishCheck(_ release: Release?, userInitiated: Bool) {
+    private func finishCheck(_ release: Release?, userInitiated: Bool, completion: (() -> Void)?) {
         DispatchQueue.main.async {
             self.isChecking = false
             if release != nil { UserDefaults.standard.set(Date(), forKey: Self.lastCheckKey) }
-            self.handle(release, userInitiated: userInitiated)
+            self.handle(release, userInitiated: userInitiated, completion: completion)
         }
     }
 
-    private func handle(_ release: Release?, userInitiated: Bool) {
+    private func handle(_ release: Release?, userInitiated: Bool, completion: (() -> Void)?) {
         let current = Self.currentVersion
         guard let release else {
             if userInitiated {
                 present(alert("Couldn't check for updates.", "New Media Writer couldn't reach GitHub. Check your connection and try again."))
             }
+            completion?()
             return
         }
         guard release.version > current else {
             if userInitiated {
                 present(alert("You're up to date", "New Media Writer \(current) is the latest version."))
             }
+            completion?()
             return
         }
-        if !userInitiated, UserDefaults.standard.string(forKey: Self.skippedVersionKey) == release.version.description { return }
+        if !userInitiated, UserDefaults.standard.string(forKey: Self.skippedVersionKey) == release.version.description {
+            completion?()
+            return
+        }
 
         let alert = alert("New Media Writer \(release.version) is available",
                           "You have \(current). The update is downloaded from GitHub and installed into \(installLocationName).")
@@ -141,10 +154,14 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
         alert.addButton(withTitle: "Skip This Version")
         present(alert) { response in
             switch response {
-            case .alertFirstButtonReturn: self.install(release)
+            case .alertFirstButtonReturn:
+                self.install(release, then: completion)
+                return
             case .alertThirdButtonReturn: UserDefaults.standard.set(release.version.description, forKey: Self.skippedVersionKey)
             default: break
             }
+            // The alert sheet is still attached when its handler runs; whatever follows may want the window.
+            DispatchQueue.main.async { completion?() }
         }
     }
 
@@ -168,13 +185,19 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
         #endif
     }
 
-    private func install(_ release: Release) {
+    /// `then` runs if the install doesn't go through (cancelled, failed, or handed to the browser);
+    /// a successful install relaunches the app instead.
+    private func install(_ release: Release, then completion: (() -> Void)? = nil) {
         guard canInstallInPlace else {
             let alert = alert("New Media Writer \(release.version) will download in your browser",
                               "This copy can't update itself from \(bundleURL.deletingLastPathComponent().path). Open the downloaded disk image and drag New Media Writer to your Applications folder.")
-            present(alert) { _ in NSWorkspace.shared.open(release.downloadURL) }
+            present(alert) { _ in
+                NSWorkspace.shared.open(release.downloadURL)
+                DispatchQueue.main.async { completion?() }
+            }
             return
         }
+        afterInstallAbandoned = completion
         pendingRelease = release
         let window = UpdateProgressWindow(version: release.version.description) { [weak self] in self?.cancelDownload() }
         progressWindow = window
@@ -198,6 +221,9 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
         pendingRelease = nil
         progressWindow?.close()
         progressWindow = nil
+        let resume = afterInstallAbandoned
+        afterInstallAbandoned = nil
+        DispatchQueue.main.async { resume?() }
     }
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,

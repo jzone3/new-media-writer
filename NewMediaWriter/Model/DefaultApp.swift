@@ -88,10 +88,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             NSDocumentController.shared.newDocument(nil)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            SessionRestore.promptIfNeeded {
-                Welcome.showIfNeeded {
-                    DefaultApp.promptIfNeeded()
-                    UpdateChecker.shared.checkOnLaunch()
+            // When last session's files are about to be offered, look for an update first: if this
+            // build crashes on one of them, the fix should be on the table before the file is.
+            let reopening = !SessionRestore.pendingFiles.isEmpty
+            let checkFirst: (@escaping () -> Void) -> Void =
+                reopening ? UpdateChecker.shared.checkBeforeReopening : { $0() }
+            checkFirst {
+                SessionRestore.promptIfNeeded {
+                    Welcome.showIfNeeded {
+                        DefaultApp.promptIfNeeded()
+                        if !reopening { UpdateChecker.shared.checkOnLaunch() }
+                    }
                 }
             }
         }

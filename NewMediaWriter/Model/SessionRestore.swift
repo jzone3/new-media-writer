@@ -40,9 +40,14 @@ enum SessionRestore {
         UserDefaults.standard.set(paths, forKey: filesKey)
     }
 
-    static func promptIfNeeded(then next: @escaping () -> Void) {
+    /// Last session's files that are still on disk and not already open in this run.
+    static var pendingFiles: [URL] {
         let open = Set(NSDocumentController.shared.documents.compactMap { $0.fileURL?.standardizedFileURL })
-        let files = lastSession.filter { FileManager.default.fileExists(atPath: $0.path) && !open.contains($0.standardizedFileURL) }
+        return lastSession.filter { FileManager.default.fileExists(atPath: $0.path) && !open.contains($0.standardizedFileURL) }
+    }
+
+    static func promptIfNeeded(then next: @escaping () -> Void) {
+        let files = pendingFiles
         lastSession = []
         guard !files.isEmpty else { return next() }
 
